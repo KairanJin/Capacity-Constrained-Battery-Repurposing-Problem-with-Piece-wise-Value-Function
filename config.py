@@ -9,7 +9,7 @@ class ProblemConfig:
     """
     Problem-related parameters.
     """
-    n_cells: int = 240
+    n_cells: int = 200
     dim: int = 2
     K: int = 4
     k_max: int = 40
@@ -21,9 +21,9 @@ class ProblemConfig:
     w: Optional[np.ndarray] = None
 
     # tier thresholds
-    theta1: float = 170.0
-    theta2: float = 155.0
-    theta3: float = 140.0
+    theta1: float = 180.0
+    theta2: float = 165.0
+    theta3: float = 150.0
 
     # tier prices
     P1: float = 100.0
@@ -169,13 +169,13 @@ class ExperimentConfig:
     """
     Experiment-level settings for batch runs.
     """
-    base_seed: int = 42
+    base_seed: int = 52
     n_replications: int = 10
 
     run_kmeans: bool = True
     run_kmeans_vns: bool = True
-    run_grasp: bool = True
-    run_column_generation: bool = True
+    run_grasp: bool = False
+    run_column_generation: bool = False
     run_ga: bool = True
 
     save_results: bool = True

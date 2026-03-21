@@ -1,6 +1,6 @@
-# heuristics/rrp_ga.py
 import time
 import copy
+import math
 import itertools
 import numpy as np
 
@@ -8,14 +8,24 @@ from heuristics.residual_packing import residual_pack_repair
 from utils import compute_centroid, compute_delta, compute_group_reward, summarize_solution
 from heuristics.rrp_kmeans import solve_rrp_kmeans
 from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
-from heuristics.rrp_grasp import solve_rrp_grasp
 
 
 # =========================================================
-# Basic evaluation
+# Basic evaluation with cache
 # =========================================================
 
-def _evaluate_group(
+def _group_key(group):
+    return tuple(sorted(group))
+
+
+def _solution_key(groups):
+    """
+    Canonical key for a whole solution, used for deduplication in population init.
+    """
+    return tuple(sorted(tuple(sorted(g)) for g in groups))
+
+
+def _evaluate_group_cached(
     X,
     group,
     K,
@@ -28,33 +38,44 @@ def _evaluate_group(
     P1,
     P2,
     P3,
+    reward_cache,
 ):
-    if len(group) != K:
-        return {
+    key = _group_key(group)
+    if key in reward_cache:
+        return reward_cache[key]
+
+    if len(key) != K:
+        info = {
             "feasible": False,
             "reward": -np.inf,
             "phi": -np.inf,
             "delta": np.inf,
         }
+        reward_cache[key] = info
+        return info
 
-    delta = compute_delta(X, group)
+    delta = compute_delta(X, list(key))
     if delta > delta_bar:
-        return {
+        info = {
             "feasible": False,
             "reward": -np.inf,
             "phi": -np.inf,
             "delta": delta,
         }
+        reward_cache[key] = info
+        return info
 
     reward, phi, delta = compute_group_reward(
-        X, group, w, lambda_penalty, theta1, theta2, theta3, P1, P2, P3
+        X, list(key), w, lambda_penalty, theta1, theta2, theta3, P1, P2, P3
     )
-    return {
+    info = {
         "feasible": True,
         "reward": reward,
         "phi": phi,
         "delta": delta,
     }
+    reward_cache[key] = info
+    return info
 
 
 def _solution_reward(
@@ -70,17 +91,20 @@ def _solution_reward(
     P1,
     P2,
     P3,
+    reward_cache,
 ):
     total = 0.0
     feasible_groups = []
 
     for g in groups:
-        info = _evaluate_group(
+        info = _evaluate_group_cached(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         if info["feasible"]:
-            feasible_groups.append(sorted(g))
+            g_sorted = sorted(g)
+            feasible_groups.append(g_sorted)
             total += info["reward"]
 
     used = set()
@@ -104,10 +128,12 @@ def _pack_reward(
     P1,
     P2,
     P3,
+    reward_cache,
 ):
-    info = _evaluate_group(
+    info = _evaluate_group_cached(
         X, g, K, delta_bar, w, lambda_penalty,
-        theta1, theta2, theta3, P1, P2, P3
+        theta1, theta2, theta3, P1, P2, P3,
+        reward_cache,
     )
     return info["reward"] if info["feasible"] else -np.inf
 
@@ -115,6 +141,30 @@ def _pack_reward(
 # =========================================================
 # Repair / construction helpers
 # =========================================================
+
+def _sample_combinations(candidate_pool, choose_k, rng, sample_combination_limit):
+    """
+    Restricted candidate search:
+    - if total combinations small, enumerate all
+    - otherwise randomly sample a limited number of unique combinations
+    """
+    n_pool = len(candidate_pool)
+    if n_pool < choose_k:
+        return []
+
+    total_combs = math.comb(n_pool, choose_k)
+    if total_combs <= sample_combination_limit:
+        return list(itertools.combinations(candidate_pool, choose_k))
+
+    combos = set()
+    max_trials = max(sample_combination_limit * 5, 50)
+    trials = 0
+    while len(combos) < sample_combination_limit and trials < max_trials:
+        comb = tuple(sorted(rng.choice(candidate_pool, size=choose_k, replace=False).tolist()))
+        combos.add(comb)
+        trials += 1
+    return list(combos)
+
 
 def _greedy_repair(
     X,
@@ -131,29 +181,29 @@ def _greedy_repair(
     P1,
     P2,
     P3,
+    rng,
+    reward_cache,
+    neighbor_limit=7,
+    sample_combination_limit=20,
 ):
-    """
-    Greedy repair from remaining pool.
-    Build additional packs around high-quality seeds.
-    """
     groups = [sorted(g) for g in fixed_groups]
     available = sorted(set(pool))
 
-    def cell_quality(i):
-        return float(np.dot(w, X[i]))
+    cell_quality = X @ w
 
     while len(available) >= K and len(groups) < k_t:
-        seed = max(available, key=cell_quality)
+        seed = max(available, key=lambda i: float(cell_quality[i]))
         available.remove(seed)
 
         scored = []
+        x_seed = X[seed]
         for j in available:
-            d = float(np.sum((X[j] - X[seed]) ** 2))
-            q = float(np.dot(w, X[j]))
+            d = float(np.sum((X[j] - x_seed) ** 2))
+            q = float(cell_quality[j])
             scored.append((-d + 0.05 * q, j))
         scored.sort(reverse=True)
 
-        candidate_pool = [j for _, j in scored[:min(max(10, K + 2), len(scored))]]
+        candidate_pool = [j for _, j in scored[:min(neighbor_limit, len(scored))]]
         if len(candidate_pool) < K - 1:
             available.append(seed)
             break
@@ -161,11 +211,19 @@ def _greedy_repair(
         best_group = None
         best_reward = -np.inf
 
-        for comb in itertools.combinations(candidate_pool, K - 1):
+        combos = _sample_combinations(
+            candidate_pool=candidate_pool,
+            choose_k=K - 1,
+            rng=rng,
+            sample_combination_limit=sample_combination_limit,
+        )
+
+        for comb in combos:
             g = sorted([seed] + list(comb))
             r = _pack_reward(
                 X, g, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3
+                theta1, theta2, theta3, P1, P2, P3,
+                reward_cache,
             )
             if r > best_reward:
                 best_reward = r
@@ -173,8 +231,7 @@ def _greedy_repair(
 
         if best_group is None or not np.isfinite(best_reward):
             available.append(seed)
-            # remove one weak cell to avoid repeated bad attempts
-            available.sort(key=cell_quality)
+            available.sort(key=lambda i: float(cell_quality[i]))
             if len(available) > 0:
                 available.pop(0)
             continue
@@ -211,6 +268,7 @@ def _evaluate_individual(
     P1,
     P2,
     P3,
+    reward_cache,
 ):
     reward, feasible_groups, leftover = _solution_reward(
         X,
@@ -225,6 +283,7 @@ def _evaluate_individual(
         P1,
         P2,
         P3,
+        reward_cache,
     )
     individual["groups"] = feasible_groups
     individual["leftover"] = leftover
@@ -246,6 +305,9 @@ def _random_greedy_individual(
     P2,
     P3,
     rng,
+    reward_cache,
+    neighbor_limit,
+    sample_combination_limit,
 ):
     pool = list(range(X.shape[0]))
     rng.shuffle(pool)
@@ -264,8 +326,21 @@ def _random_greedy_individual(
         P1=P1,
         P2=P2,
         P3=P3,
+        rng=rng,
+        reward_cache=reward_cache,
+        neighbor_limit=neighbor_limit,
+        sample_combination_limit=sample_combination_limit,
     )
     return _make_individual(groups, leftover)
+
+
+def _try_add_individual(population, seen_keys, individual):
+    key = _solution_key(individual["groups"])
+    if key not in seen_keys:
+        population.append(individual)
+        seen_keys.add(key)
+        return True
+    return False
 
 
 def _initialize_population(
@@ -283,27 +358,44 @@ def _initialize_population(
     P3,
     population_size,
     rng,
+    reward_cache,
+    neighbor_limit,
+    sample_combination_limit,
+    n_vns_seeds=None,
 ):
     """
-    Strong initialization:
-    - 2 VNS seeds
-    - 2 GRASP seeds
-    - 1 K-means seed
-    - rest random greedy
+    Improved initialization:
+    1) Generate several high-quality seeds using K-means-VNS
+    2) Optional 1 plain K-means seed for diversity
+    3) Fill the rest with random greedy individuals
+
+    This usually accelerates GA convergence a lot.
     """
     population = []
+    seen_keys = set()
 
-    # 1) VNS seeds
-    for _ in range(min(2, population_size)):
-        vns = solve_rrp_kmeans_vns(
+    if n_vns_seeds is None:
+        # use around 50%~75% of population as strong seeds
+        n_vns_seeds = max(2, min(population_size - 1, population_size // 2 + 1))
+
+    # -----------------------------------------------------
+    # 1) Multiple K-means-VNS seeds
+    # -----------------------------------------------------
+    vns_trials = max(n_vns_seeds * 3, n_vns_seeds + 2)
+
+    for _ in range(vns_trials):
+        if len(population) >= min(n_vns_seeds, population_size):
+            break
+
+        sol = solve_rrp_kmeans_vns(
             X=X,
             K=K,
             k_t=k_t,
             delta_bar=delta_bar,
             L1=15,
             tol=1e-6,
-            max_vns_iter=8,
-            max_no_improve=3,
+            max_vns_iter=12,
+            max_no_improve=4,
             w=w,
             lambda_penalty=lambda_penalty,
             theta1=theta1,
@@ -312,46 +404,14 @@ def _initialize_population(
             P1=P1,
             P2=P2,
             P3=P3,
-            seed=int(rng.integers(1, 10**9)),
-            pack_candidate_limit=5,
-            partner_limit=2,
-            cell_candidate_limit=2,
-            leftover_candidate_limit=6,
-            destroy_size=2,
+            seed=int(rng.integers(1, 10 ** 9)),
         )
-        population.append(_make_individual(vns["groups"], vns["leftover"]))
-        if len(population) >= population_size:
-            return population
+        ind = _make_individual(sol["groups"], sol["leftover"])
+        _try_add_individual(population, seen_keys, ind)
 
-    # 2) GRASP seeds
-    for _ in range(min(2, population_size - len(population))):
-        gr = solve_rrp_grasp(
-            X=X,
-            K=K,
-            k_t=k_t,
-            delta_bar=delta_bar,
-            w=w,
-            lambda_penalty=lambda_penalty,
-            theta1=theta1,
-            theta2=theta2,
-            theta3=theta3,
-            P1=P1,
-            P2=P2,
-            P3=P3,
-            seed=int(rng.integers(1, 10**9)),
-            n_starts=5,
-            rcl_size=4,
-            max_group_attempts=80,
-            max_local_iter=8,
-            group_candidate_limit=4,
-            cell_candidate_limit=2,
-            leftover_candidate_limit=6,
-        )
-        population.append(_make_individual(gr["groups"], gr["leftover"]))
-        if len(population) >= population_size:
-            return population
-
-    # 3) K-means seed
+    # -----------------------------------------------------
+    # 2) One plain K-means seed (optional diversity seed)
+    # -----------------------------------------------------
     if len(population) < population_size:
         km = solve_rrp_kmeans(
             X=X,
@@ -371,9 +431,38 @@ def _initialize_population(
             P3=P3,
             seed=int(rng.integers(1, 10**9)),
         )
-        population.append(_make_individual(km["groups"], km["leftover"]))
+        ind = _make_individual(km["groups"], km["leftover"])
+        _try_add_individual(population, seen_keys, ind)
 
-    # 4) Random greedy seeds
+    # -----------------------------------------------------
+    # 3) Fill remaining slots with random greedy individuals
+    # -----------------------------------------------------
+    random_trials = 0
+    max_random_trials = max(20, population_size * 10)
+
+    while len(population) < population_size and random_trials < max_random_trials:
+        ind = _random_greedy_individual(
+            X=X,
+            K=K,
+            k_t=k_t,
+            delta_bar=delta_bar,
+            w=w,
+            lambda_penalty=lambda_penalty,
+            theta1=theta1,
+            theta2=theta2,
+            theta3=theta3,
+            P1=P1,
+            P2=P2,
+            P3=P3,
+            rng=rng,
+            reward_cache=reward_cache,
+            neighbor_limit=neighbor_limit,
+            sample_combination_limit=sample_combination_limit,
+        )
+        _try_add_individual(population, seen_keys, ind)
+        random_trials += 1
+
+    # fallback: if deduplication makes population still too small, allow duplicates
     while len(population) < population_size:
         ind = _random_greedy_individual(
             X=X,
@@ -389,6 +478,9 @@ def _initialize_population(
             P2=P2,
             P3=P3,
             rng=rng,
+            reward_cache=reward_cache,
+            neighbor_limit=neighbor_limit,
+            sample_combination_limit=sample_combination_limit,
         )
         population.append(ind)
 
@@ -401,9 +493,8 @@ def _initialize_population(
 
 def _tournament_selection(population, tournament_size, rng):
     idx = rng.choice(len(population), size=min(tournament_size, len(population)), replace=False)
-    contestants = [population[i] for i in idx]
-    contestants.sort(key=lambda ind: ind["fitness"], reverse=True)
-    return copy.deepcopy(contestants[0])
+    best_idx = max(idx, key=lambda i: population[i]["fitness"])
+    return population[best_idx]
 
 
 # =========================================================
@@ -426,23 +517,18 @@ def _reward_biased_crossover(
     P2,
     P3,
     rng,
+    reward_cache,
+    neighbor_limit,
+    sample_combination_limit,
     inherit_top_ratio=0.6,
 ):
-    """
-    Reward-biased crossover:
-    1) collect packs from both parents
-    2) sort by pack reward descending
-    3) greedily inherit non-conflicting high-value packs
-    4) repair remaining cells
-
-    Also force some diversity by randomly skipping a few borderline packs.
-    """
     all_packs = []
 
     for g in parent1["groups"]:
         r = _pack_reward(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         if np.isfinite(r):
             all_packs.append(("p1", sorted(g), r))
@@ -450,14 +536,14 @@ def _reward_biased_crossover(
     for g in parent2["groups"]:
         r = _pack_reward(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         if np.isfinite(r):
             all_packs.append(("p2", sorted(g), r))
 
-    # remove exact duplicates by cell set, keep best reward
     uniq = {}
-    for src, g, r in all_packs:
+    for _, g, r in all_packs:
         key = tuple(g)
         if key not in uniq or r > uniq[key][1]:
             uniq[key] = (g, r)
@@ -471,18 +557,15 @@ def _reward_biased_crossover(
     top_packs = all_packs[:top_cut]
     rest_packs = all_packs[top_cut:]
 
-    # priority inheritance from top packs
-    for g, r in top_packs:
+    for g, _ in top_packs:
         if len(child_groups) >= k_t:
             break
         if all(c not in used for c in g):
-            # slight randomness only among good packs
             if rng.random() < 0.9:
                 child_groups.append(g)
                 used.update(g)
 
-    # then try the rest
-    for g, r in rest_packs:
+    for g, _ in rest_packs:
         if len(child_groups) >= k_t:
             break
         if all(c not in used for c in g):
@@ -507,6 +590,10 @@ def _reward_biased_crossover(
         P1=P1,
         P2=P2,
         P3=P3,
+        rng=rng,
+        reward_cache=reward_cache,
+        neighbor_limit=neighbor_limit,
+        sample_combination_limit=sample_combination_limit,
     )
 
     return _make_individual(child_groups, leftover)
@@ -532,19 +619,22 @@ def _targeted_destroy_repair_mutation(
     P3,
     rng,
     destroy_size,
+    reward_cache,
+    neighbor_limit,
+    sample_combination_limit,
 ):
-    groups = copy.deepcopy(individual["groups"])
-    leftover = copy.deepcopy(individual["leftover"])
+    groups = [g[:] for g in individual["groups"]]
+    leftover = individual["leftover"][:]
 
     if len(groups) == 0:
         return individual
 
-    # target weak packs more often
     scored = []
     for idx, g in enumerate(groups):
-        info = _evaluate_group(
+        info = _evaluate_group_cached(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         gap = 0.0
         if info["feasible"]:
@@ -560,7 +650,7 @@ def _targeted_destroy_repair_mutation(
         score = info["reward"] - 0.05 * gap
         scored.append((score, idx))
 
-    scored.sort()  # weakest first
+    scored.sort()
     candidate_ids = [idx for _, idx in scored[:min(max(2, destroy_size + 1), len(scored))]]
 
     if rng.random() < 0.7:
@@ -593,6 +683,10 @@ def _targeted_destroy_repair_mutation(
         P1=P1,
         P2=P2,
         P3=P3,
+        rng=rng,
+        reward_cache=reward_cache,
+        neighbor_limit=neighbor_limit,
+        sample_combination_limit=sample_combination_limit,
     )
 
     return _make_individual(new_groups, new_leftover)
@@ -617,6 +711,7 @@ def _swap_local_search_once(
     P3,
     group_candidate_limit,
     cell_candidate_limit,
+    reward_cache,
 ):
     groups = individual["groups"]
     if len(groups) <= 1:
@@ -626,7 +721,8 @@ def _swap_local_search_once(
     for idx, g in enumerate(groups):
         r = _pack_reward(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         scored.append((r, idx))
     scored.sort()
@@ -654,10 +750,12 @@ def _swap_local_search_once(
 
             old_sum = _pack_reward(
                 X, g1, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3
+                theta1, theta2, theta3, P1, P2, P3,
+                reward_cache,
             ) + _pack_reward(
                 X, g2, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3
+                theta1, theta2, theta3, P1, P2, P3,
+                reward_cache,
             )
 
             for i in idxs1:
@@ -668,10 +766,12 @@ def _swap_local_search_once(
 
                     new_sum = _pack_reward(
                         X, new_g1, K, delta_bar, w, lambda_penalty,
-                        theta1, theta2, theta3, P1, P2, P3
+                        theta1, theta2, theta3, P1, P2, P3,
+                        reward_cache,
                     ) + _pack_reward(
                         X, new_g2, K, delta_bar, w, lambda_penalty,
-                        theta1, theta2, theta3, P1, P2, P3
+                        theta1, theta2, theta3, P1, P2, P3,
+                        reward_cache,
                     )
 
                     if new_sum > old_sum + 1e-12:
@@ -698,6 +798,7 @@ def _leftover_replace_local_search_once(
     group_candidate_limit,
     cell_candidate_limit,
     leftover_candidate_limit,
+    reward_cache,
 ):
     groups = individual["groups"]
     leftover = individual["leftover"]
@@ -709,7 +810,8 @@ def _leftover_replace_local_search_once(
     for idx, g in enumerate(groups):
         r = _pack_reward(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         scored.append((r, idx))
     scored.sort()
@@ -720,7 +822,8 @@ def _leftover_replace_local_search_once(
         mu = compute_centroid(X, g)
         old_reward = _pack_reward(
             X, g, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
 
         idxs = sorted(
@@ -743,7 +846,8 @@ def _leftover_replace_local_search_once(
 
                 new_reward = _pack_reward(
                     X, new_g, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
+                    theta1, theta2, theta3, P1, P2, P3,
+                    reward_cache,
                 )
 
                 if new_reward > old_reward + 1e-12:
@@ -772,15 +876,12 @@ def _selective_local_search(
     group_candidate_limit,
     cell_candidate_limit,
     leftover_candidate_limit,
+    reward_cache,
 ):
-    """
-    Very light local search:
-    at most one improving swap and one leftover replacement.
-    """
     individual, improved = _swap_local_search_once(
         individual, X, K, delta_bar, w, lambda_penalty,
         theta1, theta2, theta3, P1, P2, P3,
-        group_candidate_limit, cell_candidate_limit
+        group_candidate_limit, cell_candidate_limit, reward_cache
     )
     if improved:
         return individual
@@ -788,7 +889,7 @@ def _selective_local_search(
     individual, _ = _leftover_replace_local_search_once(
         individual, X, K, delta_bar, w, lambda_penalty,
         theta1, theta2, theta3, P1, P2, P3,
-        group_candidate_limit, cell_candidate_limit, leftover_candidate_limit
+        group_candidate_limit, cell_candidate_limit, leftover_candidate_limit, reward_cache
     )
     return individual
 
@@ -817,11 +918,16 @@ def solve_rrp_ga(
     crossover_prob: float = 0.9,
     mutation_prob: float = 0.2,
     destroy_size: int = 1,
-    local_search_prob: float = 0.1,
+    local_search_prob: float = 0,
     elitism_size: int = 2,
     group_candidate_limit: int = 4,
     cell_candidate_limit: int = 2,
     leftover_candidate_limit: int = 6,
+    neighbor_limit: int = 7,
+    sample_combination_limit: int = 20,
+    n_vns_seeds: int | None = None,
+    stall_limit: int = 4,
+    min_improve: float = 1e-8,
 ):
     start = time.perf_counter()
     n = X.shape[0]
@@ -839,6 +945,7 @@ def solve_rrp_ga(
         }
 
     rng = np.random.default_rng(seed)
+    reward_cache = {}
 
     population = _initialize_population(
         X=X,
@@ -855,15 +962,24 @@ def solve_rrp_ga(
         P3=P3,
         population_size=population_size,
         rng=rng,
+        reward_cache=reward_cache,
+        neighbor_limit=neighbor_limit,
+        sample_combination_limit=sample_combination_limit,
+        n_vns_seeds=n_vns_seeds,
     )
 
     population = [
         _evaluate_individual(
             ind, X, K, delta_bar, w, lambda_penalty,
-            theta1, theta2, theta3, P1, P2, P3
+            theta1, theta2, theta3, P1, P2, P3,
+            reward_cache,
         )
         for ind in population
     ]
+
+    population.sort(key=lambda ind: ind["fitness"], reverse=True)
+    best_fitness_so_far = population[0]["fitness"]
+    stall_count = 0
 
     for _ in range(n_generations):
         population.sort(key=lambda ind: ind["fitness"], reverse=True)
@@ -878,7 +994,10 @@ def solve_rrp_ga(
             if rng.random() < crossover_prob:
                 child = _reward_biased_crossover(
                     parent1, parent2, X, K, k_t, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3, rng
+                    theta1, theta2, theta3, P1, P2, P3, rng,
+                    reward_cache=reward_cache,
+                    neighbor_limit=neighbor_limit,
+                    sample_combination_limit=sample_combination_limit,
                 )
             else:
                 child = copy.deepcopy(parent1)
@@ -886,32 +1005,48 @@ def solve_rrp_ga(
             if rng.random() < mutation_prob:
                 child = _targeted_destroy_repair_mutation(
                     child, X, K, k_t, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3, rng, destroy_size
+                    theta1, theta2, theta3, P1, P2, P3, rng, destroy_size,
+                    reward_cache=reward_cache,
+                    neighbor_limit=neighbor_limit,
+                    sample_combination_limit=sample_combination_limit,
                 )
 
             child = _evaluate_individual(
                 child, X, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3
+                theta1, theta2, theta3, P1, P2, P3,
+                reward_cache,
             )
             offspring_pool.append(child)
 
-        # selective local search: only top 1 offspring or clearly good offspring
         offspring_pool.sort(key=lambda ind: ind["fitness"], reverse=True)
 
         if len(offspring_pool) > 0 and rng.random() < local_search_prob:
             offspring_pool[0] = _selective_local_search(
                 offspring_pool[0], X, K, delta_bar, w, lambda_penalty,
                 theta1, theta2, theta3, P1, P2, P3,
-                group_candidate_limit, cell_candidate_limit, leftover_candidate_limit
+                group_candidate_limit, cell_candidate_limit, leftover_candidate_limit,
+                reward_cache,
             )
             offspring_pool[0] = _evaluate_individual(
                 offspring_pool[0], X, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3
+                theta1, theta2, theta3, P1, P2, P3,
+                reward_cache,
             )
 
         new_population.extend(offspring_pool)
         new_population.sort(key=lambda ind: ind["fitness"], reverse=True)
         population = new_population[:population_size]
+
+        current_best = population[0]["fitness"]
+
+        if current_best > best_fitness_so_far + min_improve:
+            best_fitness_so_far = current_best
+            stall_count = 0
+        else:
+            stall_count += 1
+
+        if stall_count >= stall_limit:
+            break
 
     population.sort(key=lambda ind: ind["fitness"], reverse=True)
     best = population[0]
@@ -932,9 +1067,9 @@ def solve_rrp_ga(
         P2=P2,
         P3=P3,
         min_accept_reward=0.0,
-        seed_candidate_limit=12,
-        neighbor_candidate_limit=12,
-        max_rounds=50,
+        max_rounds=15,
+        seed_candidate_limit=8,
+        neighbor_candidate_limit=8,
     )
 
     final_summary = summarize_solution(
@@ -950,11 +1085,6 @@ def solve_rrp_ga(
         P2=P2,
         P3=P3,
     )
-
-    used = set()
-    for g in best["groups"]:
-        used.update(g)
-    leftover = [i for i in range(n) if i not in used]
 
     return {
         "method": "RRP_GA",
