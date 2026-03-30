@@ -11,6 +11,7 @@ from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
 from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_ga import solve_rrp_ga
 from heuristics.rrp_column_generation import solve_rrp_column_generation
+from heuristics.solve_rrp_lns import solve_rrp_lns
 from utils import summarize_solution, safe_div
 
 
@@ -174,6 +175,25 @@ def main():
         )
         results.append(enrich_result(res, X, cfg))
 
+    # Large Neighborhood Search (LNS)
+    if getattr(cfg.experiment, 'run_lns', True):
+        res = solve_rrp_lns(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
+        )
+        results.append(enrich_result(res, X, cfg))
+
     run_cg = cfg.experiment.run_column_generation
     if cfg.experiment.skip_cg_for_large_instances and cfg.problem.n_cells > cfg.experiment.cg_size_threshold:
         run_cg = False
@@ -223,7 +243,6 @@ def main():
     print("\n=== Single Instance Results ===")
     with pd.option_context("display.max_columns", None, "display.width", 260):
         print(df.to_string(index=False))
-
 
 if __name__ == "__main__":
     main()

@@ -183,8 +183,8 @@ def _greedy_repair(
     P3,
     rng,
     reward_cache,
-    neighbor_limit=7,
-    sample_combination_limit=20,
+    neighbor_limit=6,
+    sample_combination_limit=15,
 ):
     groups = [sorted(g) for g in fixed_groups]
     available = sorted(set(pool))
@@ -365,23 +365,23 @@ def _initialize_population(
 ):
     """
     Improved initialization:
-    1) Generate several high-quality seeds using K-means-VNS
+    1) Generate a few high-quality seeds using K-means-VNS (reduced for speed)
     2) Optional 1 plain K-means seed for diversity
     3) Fill the rest with random greedy individuals
 
-    This usually accelerates GA convergence a lot.
+    Optimized: reduced VNS seeds significantly for faster runtime.
     """
     population = []
     seen_keys = set()
 
     if n_vns_seeds is None:
-        # use around 50%~75% of population as strong seeds
-        n_vns_seeds = max(2, min(population_size - 1, population_size // 2 + 1))
+        # Use fewer VNS seeds (only 2-3) for speed - GA will explore the space
+        n_vns_seeds = max(2, min(3, population_size // 4))
 
     # -----------------------------------------------------
-    # 1) Multiple K-means-VNS seeds
+    # 1) Limited K-means-VNS seeds with reduced iterations
     # -----------------------------------------------------
-    vns_trials = max(n_vns_seeds * 3, n_vns_seeds + 2)
+    vns_trials = n_vns_seeds + 1
 
     for _ in range(vns_trials):
         if len(population) >= min(n_vns_seeds, population_size):
@@ -392,10 +392,10 @@ def _initialize_population(
             K=K,
             k_t=k_t,
             delta_bar=delta_bar,
-            L1=15,
+            L1=12,
             tol=1e-6,
-            max_vns_iter=12,
-            max_no_improve=4,
+            max_vns_iter=8,
+            max_no_improve=3,
             w=w,
             lambda_penalty=lambda_penalty,
             theta1=theta1,
@@ -418,8 +418,8 @@ def _initialize_population(
             K=K,
             k_t=k_t,
             delta_bar=delta_bar,
-            L1=15,
-            L2=8,
+            L1=12,
+            L2=6,
             tol=1e-6,
             w=w,
             lambda_penalty=lambda_penalty,
@@ -438,7 +438,7 @@ def _initialize_population(
     # 3) Fill remaining slots with random greedy individuals
     # -----------------------------------------------------
     random_trials = 0
-    max_random_trials = max(20, population_size * 10)
+    max_random_trials = max(15, population_size * 5)
 
     while len(population) < population_size and random_trials < max_random_trials:
         ind = _random_greedy_individual(
@@ -561,7 +561,7 @@ def _reward_biased_crossover(
         if len(child_groups) >= k_t:
             break
         if all(c not in used for c in g):
-            if rng.random() < 0.9:
+            if rng.random() < 0.85:
                 child_groups.append(g)
                 used.update(g)
 
@@ -569,7 +569,7 @@ def _reward_biased_crossover(
         if len(child_groups) >= k_t:
             break
         if all(c not in used for c in g):
-            if rng.random() < 0.5:
+            if rng.random() < 0.4:
                 child_groups.append(g)
                 used.update(g)
 
@@ -912,21 +912,21 @@ def solve_rrp_ga(
     P2: float,
     P3: float,
     seed: int | None = None,
-    population_size: int = 8,
-    n_generations: int = 10,
+    population_size: int = 12,
+    n_generations: int = 12,
     tournament_size: int = 3,
-    crossover_prob: float = 0.9,
-    mutation_prob: float = 0.2,
-    destroy_size: int = 1,
-    local_search_prob: float = 0,
+    crossover_prob: float = 0.85,
+    mutation_prob: float = 0.35,
+    destroy_size: int = 2,
+    local_search_prob: float = 0.15,
     elitism_size: int = 2,
     group_candidate_limit: int = 4,
     cell_candidate_limit: int = 2,
     leftover_candidate_limit: int = 6,
-    neighbor_limit: int = 7,
-    sample_combination_limit: int = 20,
+    neighbor_limit: int = 6,
+    sample_combination_limit: int = 15,
     n_vns_seeds: int | None = None,
-    stall_limit: int = 4,
+    stall_limit: int = 3,
     min_improve: float = 1e-8,
 ):
     start = time.perf_counter()
