@@ -18,13 +18,15 @@ from heuristics.rrp_kmeans import solve_rrp_kmeans
 from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
 from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_column_generation import solve_rrp_column_generation
+from heuristics.rrp_ms_kmeans_vns import solve_rrp_ms_kmeans_vns
 from utils import safe_div, summarize_solution
 
 
 METHODS = [
     "RRP_KMEANS",
     "RRP_KMEANS_VNS",
-    #"RRP_GRASP",
+    "RRP_MS_KMEANS_VNS",
+    # "RRP_GRASP",
     "RRP_GA",
     "RRP_COLUMN_GENERATION",
 ]
@@ -32,6 +34,7 @@ METHODS = [
 METHOD_LABELS = {
     "RRP_KMEANS": "KMeans",
     "RRP_KMEANS_VNS": "KMeans_VNS",
+    "RRP_MS_KMEANS_VNS": "MS_KMeans_VNS",
     "RRP_GRASP": "GRASP",
     "RRP_GA": "GA",
     "RRP_COLUMN_GENERATION": "ColumnGeneration",
@@ -169,6 +172,23 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             cell_candidate_limit=cfg.vns.cell_candidate_limit,
             leftover_candidate_limit=cfg.vns.leftover_candidate_limit,
             destroy_size=cfg.vns.destroy_size,
+        )
+
+    elif method == "RRP_MS_KMEANS_VNS":
+        res = solve_rrp_ms_kmeans_vns(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
         )
 
     elif method == "RRP_GRASP":
@@ -752,7 +772,7 @@ def main():
 
     # 2) 实际跑实验，并输出结果到 Excel
     detail_df, summary_df = run_multi_round_experiment(
-        n_rounds=1,
+        n_rounds=10,
         arrivals_per_round=400,
         output_excel_path="rrp_multi_round_output.xlsx",
     )
