@@ -4,7 +4,22 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a3752f90-117a-4f11-92b2-7485862fe60d" name="更改" comment="开始使用claude之前第一版本代码" />
+    <list default="true" id="a3752f90-117a-4f11-92b2-7485862fe60d" name="更改" comment="开始使用claude之前第一版本代码">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/es_based_rrp.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/hybrid_rl_ga.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/neural_rl.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/rrp_kmeans_vns.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/rrp_kmeans_vns.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/solve_rrp_es_based_rrp.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/solve_rrp_hybrid_rl_ga.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/solve_rrp_lns.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/solve_rrp_neural_rl.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/multi_inner_opt.py" beforeDir="false" afterPath="$PROJECT_DIR$/multi_inner_opt.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rrp_multi_round_output.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/rrp_multi_round_output.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rrp_multi_round_template.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/rrp_multi_round_template.xlsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -25,12 +40,12 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "KairanJin"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;KairanJin&quot;
   }
-}]]></component>
+}</component>
   <component name="GitLabMergeRequestFiltersHistory">{
   &quot;lastFilter&quot;: {
     &quot;state&quot;: &quot;OPENED&quot;,
@@ -47,12 +62,12 @@
     &quot;second&quot;: &quot;efdc62d6-fd4c-406c-894d-5c63a7a03aa5&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/KairanJin/Capacity-Constrained-Battery-Repurposing-Problem-with-Piece-wise-Value-Function.git",
-    "accountId": "bc5c47bd-b086-49e1-9e78-aa81d05a448c"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:KairanJin/Capacity-Constrained-Battery-Repurposing-Problem-with-Piece-wise-Value-Function.git&quot;,
+    &quot;accountId&quot;: &quot;bc5c47bd-b086-49e1-9e78-aa81d05a448c&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -64,49 +79,50 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.Test111.executor": "Run",
-    "Python.Three_heuristic_algorithms.executor": "Run",
-    "Python.accurate_algorithm_MIQP.executor": "Run",
-    "Python.config.executor": "Run",
-    "Python.fixed_quantity.executor": "Run",
-    "Python.heart_drawing.executor": "Run",
-    "Python.k-means_with_capacity_constraint.executor": "Run",
-    "Python.main (1).executor": "Run",
-    "Python.main.executor": "Run",
-    "Python.main_two_stage.executor": "Run",
-    "Python.multi_inner_opt.executor": "Run",
-    "Python.neural_rl.executor": "Run",
-    "Python.rrp_combine_repair.executor": "Run",
-    "Python.rrp_ga.executor": "Run",
-    "Python.run_experiment.executor": "Run",
-    "Python.run_two_stage_experiment.executor": "Run",
-    "Python.test_outer.executor": "Run",
-    "Python.upper_bound.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/Program Files (x86)/Pycharm_project/two-stage",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.Test111.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Three_heuristic_algorithms.executor&quot;: &quot;Run&quot;,
+    &quot;Python.accurate_algorithm_MIQP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.config.executor&quot;: &quot;Run&quot;,
+    &quot;Python.fixed_quantity.executor&quot;: &quot;Run&quot;,
+    &quot;Python.heart_drawing.executor&quot;: &quot;Run&quot;,
+    &quot;Python.k-means_with_capacity_constraint.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_two_stage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.multi_inner_opt.executor&quot;: &quot;Run&quot;,
+    &quot;Python.neural_rl.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rrp_combine_repair.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rrp_ga.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rrp_kmeans_vns.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_experiment.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_two_stage_experiment.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_outer.executor&quot;: &quot;Run&quot;,
+    &quot;Python.upper_bound.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Program Files (x86)/Pycharm_project/two-stage&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\Program Files (x86)\Pycharm_project\two-stage\Old_code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main">
-    <configuration name="heart_drawing" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="Python.multi_inner_opt">
+    <configuration name="config" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="PythonProject" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -120,7 +136,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/heart_drawing.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/config.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -198,7 +214,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="rrp_combine_repair" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="rrp_kmeans_vns" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="PythonProject" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -212,7 +228,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/heuristics/rrp_combine_repair.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/heuristics/rrp_kmeans_vns.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -223,11 +239,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.multi_inner_opt" />
+        <item itemvalue="Python.config" />
+        <item itemvalue="Python.rrp_kmeans_vns" />
         <item itemvalue="Python.main" />
         <item itemvalue="Python.neural_rl" />
-        <item itemvalue="Python.heart_drawing" />
-        <item itemvalue="Python.rrp_combine_repair" />
-        <item itemvalue="Python.multi_inner_opt" />
       </list>
     </recent_temporary>
   </component>
@@ -274,7 +290,10 @@
       <workItem from="1774111889552" duration="85000" />
       <workItem from="1774144872303" duration="8156000" />
       <workItem from="1774159264195" duration="2435000" />
-      <workItem from="1774875430165" duration="2774000" />
+      <workItem from="1774875430165" duration="3953000" />
+      <workItem from="1774942146435" duration="2872000" />
+      <workItem from="1775709411989" duration="1226000" />
+      <workItem from="1778513427817" duration="16222000" />
     </task>
     <task id="LOCAL-00001" summary="测试">
       <option name="closed" value="true" />
@@ -314,6 +333,17 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="测试" />
     <MESSAGE value="正式开始写代码" />
@@ -327,14 +357,15 @@
     <SUITE FILE_PATH="coverage/two_stage$rrp_combine_repair.coverage" NAME="rrp_combine_repair 覆盖结果" MODIFIED="1773848348825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
     <SUITE FILE_PATH="coverage/two_stage$test_outer.coverage" NAME="test_outer 覆盖结果" MODIFIED="1773501623308" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/outer" />
     <SUITE FILE_PATH="coverage/two_stage$k_means_with_capacity_constraint.coverage" NAME="k-means_with_capacity_constraint 覆盖结果" MODIFIED="1773384375412" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$rrp_kmeans_vns.coverage" NAME="rrp_kmeans_vns 覆盖结果" MODIFIED="1778579168688" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
     <SUITE FILE_PATH="coverage/two_stage$Test111.coverage" NAME="Test111 覆盖结果" MODIFIED="1773384386082" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$run_experiment.coverage" NAME="run_experiment 覆盖结果" MODIFIED="1773546905420" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$rrp_ga.coverage" NAME="rrp_ga 覆盖结果" MODIFIED="1773847396482" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
-    <SUITE FILE_PATH="coverage/two_stage$config.coverage" NAME="config 覆盖结果" MODIFIED="1773584494467" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$config.coverage" NAME="config 覆盖结果" MODIFIED="1778580842727" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$run_two_stage_experiment.coverage" NAME="run_two_stage_experiment 覆盖结果" MODIFIED="1773584755486" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$accurate_algorithm_MIQP.coverage" NAME="accurate_algorithm_MIQP 覆盖结果" MODIFIED="1761654784634" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$heart_drawing.coverage" NAME="heart_drawing 覆盖结果" MODIFIED="1774064520376" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/two_stage$multi_inner_opt.coverage" NAME="multi_inner_opt 覆盖结果" MODIFIED="1773847632660" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$multi_inner_opt.coverage" NAME="multi_inner_opt 覆盖结果" MODIFIED="1778580851896" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$Three_heuristic_algorithms.coverage" NAME="Three_heuristic_algorithms 覆盖结果" MODIFIED="1761655462139" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$main__1_.coverage" NAME="main (1) 覆盖结果" MODIFIED="1773498321063" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$.coverage" NAME="最新 覆盖结果" MODIFIED="1762095336866" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

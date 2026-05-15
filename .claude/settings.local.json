@@ -15,7 +15,8 @@
       "Bash(mkdir -p heuristics)",
       "Bash(touch heuristics/hybrid_rl_ga.py heuristics/neural_rl.py heuristics/es_based_rrp.py)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git checkout *)"
     ]
   }
 }

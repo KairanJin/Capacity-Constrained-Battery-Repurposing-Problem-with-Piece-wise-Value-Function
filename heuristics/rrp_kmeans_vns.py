@@ -691,6 +691,7 @@ def solve_rrp_kmeans_vns(
     cell_candidate_limit: int = 3,
     leftover_candidate_limit: int = 12,
     destroy_size: int = 2,
+    enable_n5: bool = False,   # 新增：默认关闭 N5 merge-split
 ):
     start = time.perf_counter()
     n = X.shape[0]
@@ -785,7 +786,7 @@ def solve_rrp_kmeans_vns(
                 break
 
         # -------------------------------------------------
-        # Phase B: heavy neighborhoods only after light ones converge
+        # Phase B: heavy neighborhood N4
         # -------------------------------------------------
         if not improved:
             found_n4, new_groups, new_leftover = _n4_destroy_repair(
@@ -802,7 +803,11 @@ def solve_rrp_kmeans_vns(
                 )
                 improved = True
 
-        if not improved:
+        # -------------------------------------------------
+        # Phase C: optional N5 merge-split
+        # 默认关闭，因为 K=8 时 C(16,8)=12870，计算量很大
+        # -------------------------------------------------
+        if enable_n5 and not improved:
             found_n5, new_groups, new_leftover = _n5_merge_split(
                 X, groups, infos, leftover, K, delta_bar, w, lambda_penalty,
                 theta1, theta2, theta3, P1, P2, P3,

@@ -20,7 +20,7 @@ class ProblemConfig:
     n_cells: int = 500
     K: int = 8
     k_max: int = 30
-    delta_bar: float = 0.1  # Relaxed from 5.0 to 0.1
+    delta_bar: float = 0.2
     w: Tuple[float, float] = (0.5, 0.5)
     lambda_penalty: float = 0.05
     theta1: float = 0.5  # Adjusted to align with data distribution

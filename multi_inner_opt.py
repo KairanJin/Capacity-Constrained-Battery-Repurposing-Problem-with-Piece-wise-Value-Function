@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import math
@@ -14,20 +13,20 @@ from openpyxl.utils import get_column_letter
 
 from config import Config
 from data_generator import generate_cells
-from heuristics.rrp_column_generation import solve_rrp_column_generation
 from heuristics.rrp_ga import solve_rrp_ga
-from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_kmeans import solve_rrp_kmeans
 from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
+from heuristics.rrp_grasp import solve_rrp_grasp
+from heuristics.rrp_column_generation import solve_rrp_column_generation
 from utils import safe_div, summarize_solution
 
 
 METHODS = [
     "RRP_KMEANS",
     "RRP_KMEANS_VNS",
-    # "RRP_GRASP",
+    #"RRP_GRASP",
     "RRP_GA",
-    # "RRP_COLUMN_GENERATION",
+    "RRP_COLUMN_GENERATION",
 ]
 
 METHOD_LABELS = {
@@ -35,7 +34,7 @@ METHOD_LABELS = {
     "RRP_KMEANS_VNS": "KMeans_VNS",
     "RRP_GRASP": "GRASP",
     "RRP_GA": "GA",
-    "RRP_COLUMN_GENERATION": "Column_Generation",
+    "RRP_COLUMN_GENERATION": "ColumnGeneration",
 }
 
 
@@ -97,6 +96,30 @@ def make_empty_result(method: str, X: np.ndarray) -> dict:
     }
 
 
+def standardize_cells(X_raw: np.ndarray, cfg: Config) -> np.ndarray:
+    """
+    将原始电芯数据标准化为算法使用的 X。
+
+    假设 generate_cells 输出的两列分别为：
+    第 0 列：capacity C
+    第 1 列：resistance R
+
+    标准化方式：
+    C_tilde = (C - mu_C) / sigma_C
+    R_tilde = (R - mu_R) / sigma_R
+    """
+    X_raw = np.asarray(X_raw, dtype=float)
+
+    X_std = np.column_stack(
+        [
+            (X_raw[:, 0] - cfg.data.mu_C) / cfg.data.sigma_C,
+            (X_raw[:, 1] - cfg.data.mu_R) / cfg.data.sigma_R,
+        ]
+    )
+
+    return X_std
+
+
 def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict:
     k_t = min(cfg.problem.k_max, X.shape[0] // cfg.problem.K)
     if X.shape[0] < cfg.problem.K or k_t <= 0:
@@ -121,6 +144,7 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             P3=cfg.problem.P3,
             seed=seed,
         )
+
     elif method == "RRP_KMEANS_VNS":
         res = solve_rrp_kmeans_vns(
             X=X,
@@ -146,7 +170,11 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             leftover_candidate_limit=cfg.vns.leftover_candidate_limit,
             destroy_size=cfg.vns.destroy_size,
         )
+
     elif method == "RRP_GRASP":
+        # solve_rrp_grasp.py 中已经设置了默认参数：
+        # n_starts=20, rcl_size=4, max_group_attempts=200, max_local_iter=30 等。
+        # 这里先只传公共问题参数，避免依赖 config.py 中不存在的 cfg.grasp。
         res = solve_rrp_grasp(
             X=X,
             K=cfg.problem.K,
@@ -161,14 +189,8 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             P2=cfg.problem.P2,
             P3=cfg.problem.P3,
             seed=seed,
-            n_starts=cfg.grasp.n_starts,
-            rcl_size=cfg.grasp.rcl_size,
-            max_group_attempts=cfg.grasp.max_group_attempts,
-            max_local_iter=cfg.grasp.max_local_iter,
-            group_candidate_limit=cfg.grasp.group_candidate_limit,
-            cell_candidate_limit=cfg.grasp.cell_candidate_limit,
-            leftover_candidate_limit=cfg.grasp.leftover_candidate_limit,
         )
+
     elif method == "RRP_GA":
         res = solve_rrp_ga(
             X=X,
@@ -196,7 +218,11 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             cell_candidate_limit=cfg.ga.cell_candidate_limit,
             leftover_candidate_limit=cfg.ga.leftover_candidate_limit,
         )
+
     elif method == "RRP_COLUMN_GENERATION":
+        # solve_rrp_column_generation.py 中已经设置了默认参数：
+        # max_cg_iter=30, init_n_starts=30, pricing_n_seeds=40 等。
+        # 这里先只传公共问题参数，避免依赖 config.py 中不存在的 cfg.column_generation。
         res = solve_rrp_column_generation(
             X=X,
             K=cfg.problem.K,
@@ -210,14 +236,13 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             P1=cfg.problem.P1,
             P2=cfg.problem.P2,
             P3=cfg.problem.P3,
-            max_cg_iter=cfg.cg.max_cg_iter,
-            init_n_starts=cfg.cg.init_n_starts,
-            init_neighbor_size=cfg.cg.init_neighbor_size,
-            pricing_n_seeds=cfg.cg.pricing_n_seeds,
-            pricing_neighbor_size=cfg.cg.pricing_neighbor_size,
-            max_new_cols=cfg.cg.max_new_cols,
             seed=seed,
+            # 如果本地装了 Gurobi，默认会尝试 Gurobi pricing；
+            # 没有 Gurobi 时，rrp_column_generation.py 内部会自动 fallback。
+            # 若想强制只用 PuLP/CBC + local enumeration，可改为 False。
+            use_gurobi_pricing=True,
         )
+
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -231,11 +256,16 @@ def run_multi_round_experiment(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     多轮重组逻辑：
-    - 每轮新到 130 个电芯
+    - 每轮新到 arrivals_per_round 个电芯
     - 不考虑报废
     - 每种算法维护自己的 leftover 池
     - 每轮的 pool = 上一轮 leftover + 本轮新到电芯
     - 每轮重组后的 leftover 进入下一轮
+
+    重要修改：
+    - generate_cells 生成的是原始尺度下的电芯数据
+    - 在进入算法前，需要统一标准化
+    - pool_by_method 中保存的 leftover 也是标准化后的数据
     """
     cfg = Config()
     base_seed = cfg.experiment.base_seed
@@ -248,7 +278,10 @@ def run_multi_round_experiment(
     for round_idx in range(1, n_rounds + 1):
         round_seed = base_seed + round_idx
 
-        new_cells = generate_cells(
+        # =====================================================
+        # 1) 生成原始电芯数据
+        # =====================================================
+        new_cells_raw = generate_cells(
             n_cells=arrivals_per_round,
             mu_C=cfg.data.mu_C,
             sigma_C=cfg.data.sigma_C,
@@ -257,14 +290,40 @@ def run_multi_round_experiment(
             seed=round_seed,
         )
 
+        # =====================================================
+        # 2) 标准化后再进入算法
+        # =====================================================
+        new_cells = standardize_cells(new_cells_raw, cfg)
+
+        # 只在第一轮打印一次标准化检查
+        if round_idx == 1:
+            print("\n=== Standardization Check ===")
+            print("raw new_cells mean =", new_cells_raw.mean(axis=0))
+            print("raw new_cells std  =", new_cells_raw.std(axis=0))
+            print("std new_cells mean =", new_cells.mean(axis=0))
+            print("std new_cells std  =", new_cells.std(axis=0))
+            print("std new_cells min  =", new_cells.min(axis=0))
+            print("std new_cells max  =", new_cells.max(axis=0))
+            print("delta_bar =", cfg.problem.delta_bar)
+            print("theta1, theta2, theta3 =", cfg.problem.theta1, cfg.problem.theta2, cfg.problem.theta3)
+
         for method_idx, method in enumerate(METHODS):
-            print(
-                f"[Round {round_idx}/{n_rounds}] Start {method} | pool size = {pool_before.shape[0] if pool_by_method[method] is not None and pool_by_method[method].shape[0] > 0 else new_cells.shape[0]}")
+            # =====================================================
+            # 3) 构造当前算法本轮的 pool
+            # 注意：pool_by_method 中存储的也是标准化后的 leftover
+            # =====================================================
             if pool_by_method[method] is None or pool_by_method[method].shape[0] == 0:
                 pool_before = new_cells.copy()
             else:
                 pool_before = np.vstack([pool_by_method[method], new_cells])
 
+            print(
+                f"[Round {round_idx}/{n_rounds}] Start {method} | pool size = {pool_before.shape[0]}"
+            )
+
+            # =====================================================
+            # 4) 求解当前方法
+            # =====================================================
             result = solve_one_method(
                 method=method,
                 X=pool_before,
@@ -272,6 +331,9 @@ def run_multi_round_experiment(
                 seed=round_seed * 100 + method_idx,
             )
 
+            # =====================================================
+            # 5) 保存 leftover 进入下一轮
+            # =====================================================
             leftover_idx = result["leftover"]
             if len(leftover_idx) > 0:
                 next_pool = pool_before[leftover_idx].copy()
@@ -442,7 +504,6 @@ def export_results_to_excel(
     # =========================
     ws = wb.create_sheet("Round_Results")
     if detail_df.empty:
-        # create 100 placeholder rows for 20 rounds x 5 methods
         rows = []
         for r in range(1, n_rounds + 1):
             for method in METHODS:
@@ -525,12 +586,18 @@ def export_results_to_excel(
         ws.cell(i, 7, f'=SUMIFS(Round_Results!$I:$I,Round_Results!$B:$B,$A{i})')
         ws.cell(i, 8, f'=SUMIFS(Round_Results!$J:$J,Round_Results!$B:$B,$A{i})')
         ws.cell(i, 9, f'=MAXIFS(Round_Results!$K:$K,Round_Results!$B:$B,$A{i},Round_Results!$A:$A,{n_rounds})')
-        ws.cell(i,10, f'=SUMIFS(Round_Results!$U:$U,Round_Results!$B:$B,$A{i})')
-        ws.cell(i,11, f'=SUMIFS(Round_Results!$V:$V,Round_Results!$B:$B,$A{i})')
-        ws.cell(i,12, f'=SUMIFS(Round_Results!$W:$W,Round_Results!$B:$B,$A{i})')
-        ws.cell(i,13, f'=SUMIFS(Round_Results!$X:$X,Round_Results!$B:$B,$A{i})')
+        ws.cell(i, 10, f'=SUMIFS(Round_Results!$U:$U,Round_Results!$B:$B,$A{i})')
+        ws.cell(i, 11, f'=SUMIFS(Round_Results!$V:$V,Round_Results!$B:$B,$A{i})')
+        ws.cell(i, 12, f'=SUMIFS(Round_Results!$W:$W,Round_Results!$B:$B,$A{i})')
+        ws.cell(i, 13, f'=SUMIFS(Round_Results!$X:$X,Round_Results!$B:$B,$A{i})')
 
-    _set_col_widths(ws, {1: 24, 2: 20, 3: 18, 4: 22, 5: 16, 6: 14, 7: 14, 8: 16, 9: 14, 10: 14, 11: 14, 12: 14, 13: 14})
+    _set_col_widths(
+        ws,
+        {
+            1: 24, 2: 20, 3: 18, 4: 22, 5: 16, 6: 14, 7: 14,
+            8: 16, 9: 14, 10: 14, 11: 14, 12: 14, 13: 14,
+        },
+    )
 
     # =========================
     # ChartData_CumReward
@@ -543,8 +610,9 @@ def export_results_to_excel(
         ws.cell(i, 1, i - 1)
         for j, method in enumerate(METHODS, start=2):
             ws.cell(
-                i, j,
-                f'=SUMIFS(Round_Results!$F:$F,Round_Results!$B:$B,{get_column_letter(j)}$1,Round_Results!$A:$A,"<="&$A{i})'
+                i,
+                j,
+                f'=SUMIFS(Round_Results!$F:$F,Round_Results!$B:$B,{get_column_letter(j)}$1,Round_Results!$A:$A,"<="&$A{i})',
             )
     _apply_header_style(ws, 1)
     _set_col_widths(ws, {1: 10, 2: 18, 3: 18, 4: 18, 5: 18, 6: 24})
@@ -576,8 +644,9 @@ def export_results_to_excel(
         ws.cell(i, 1, i - 1)
         for j, method in enumerate(METHODS, start=2):
             ws.cell(
-                i, j,
-                f'=SUMIFS(Round_Results!$H:$H,Round_Results!$B:$B,{get_column_letter(j)}$1,Round_Results!$A:$A,$A{i})'
+                i,
+                j,
+                f'=SUMIFS(Round_Results!$H:$H,Round_Results!$B:$B,{get_column_letter(j)}$1,Round_Results!$A:$A,$A{i})',
             )
     _apply_header_style(ws, 1)
     _set_col_widths(ws, {1: 10, 2: 18, 3: 18, 4: 18, 5: 18, 6: 24})
@@ -594,8 +663,19 @@ def export_results_to_excel(
     chart1.x_axis.title = "轮次"
     chart1.height = 9
     chart1.width = 18
-    data = Reference(wb["ChartData_CumReward"], min_col=2, max_col=1 + len(METHODS), min_row=1, max_row=n_rounds + 1)
-    cats = Reference(wb["ChartData_CumReward"], min_col=1, min_row=2, max_row=n_rounds + 1)
+    data = Reference(
+        wb["ChartData_CumReward"],
+        min_col=2,
+        max_col=1 + len(METHODS),
+        min_row=1,
+        max_row=n_rounds + 1,
+    )
+    cats = Reference(
+        wb["ChartData_CumReward"],
+        min_col=1,
+        min_row=2,
+        max_row=n_rounds + 1,
+    )
     chart1.add_data(data, titles_from_data=True)
     chart1.set_categories(cats)
     chart1.style = 2
@@ -610,8 +690,19 @@ def export_results_to_excel(
     chart2.x_axis.title = "总重组电芯数量"
     chart2.height = 10
     chart2.width = 18
-    data = Reference(wb["ChartData_TierCells"], min_col=2, max_col=5, min_row=1, max_row=1 + len(METHODS))
-    cats = Reference(wb["ChartData_TierCells"], min_col=1, min_row=2, max_row=1 + len(METHODS))
+    data = Reference(
+        wb["ChartData_TierCells"],
+        min_col=2,
+        max_col=5,
+        min_row=1,
+        max_row=1 + len(METHODS),
+    )
+    cats = Reference(
+        wb["ChartData_TierCells"],
+        min_col=1,
+        min_row=2,
+        max_row=1 + len(METHODS),
+    )
     chart2.add_data(data, titles_from_data=True)
     chart2.set_categories(cats)
     ws.add_chart(chart2, "A20")
@@ -623,8 +714,19 @@ def export_results_to_excel(
     chart3.x_axis.title = "轮次"
     chart3.height = 9
     chart3.width = 18
-    data = Reference(wb["ChartData_Runtime"], min_col=2, max_col=1 + len(METHODS), min_row=1, max_row=n_rounds + 1)
-    cats = Reference(wb["ChartData_Runtime"], min_col=1, min_row=2, max_row=n_rounds + 1)
+    data = Reference(
+        wb["ChartData_Runtime"],
+        min_col=2,
+        max_col=1 + len(METHODS),
+        min_row=1,
+        max_row=n_rounds + 1,
+    )
+    cats = Reference(
+        wb["ChartData_Runtime"],
+        min_col=1,
+        min_row=2,
+        max_row=n_rounds + 1,
+    )
     chart3.add_data(data, titles_from_data=True)
     chart3.set_categories(cats)
     chart3.style = 2
@@ -640,7 +742,6 @@ def export_results_to_excel(
                 if isinstance(cell.value, str) and cell.value.startswith("="):
                     cell.number_format = "0.000"
 
-    # Save
     output_path = str(Path(output_path))
     wb.save(output_path)
 
@@ -649,9 +750,9 @@ def main():
     # 1) 生成可直接复用的空模板
     create_excel_template_only("rrp_multi_round_template.xlsx", n_rounds=20)
 
-    # 2) 实际跑 20 轮实验，并输出结果到 Excel
+    # 2) 实际跑实验，并输出结果到 Excel
     detail_df, summary_df = run_multi_round_experiment(
-        n_rounds=20,
+        n_rounds=1,
         arrivals_per_round=400,
         output_excel_path="rrp_multi_round_output.xlsx",
     )
