@@ -5,9 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a3752f90-117a-4f11-92b2-7485862fe60d" name="更改" comment="开始使用claude之前第一版本代码">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/PythonProject.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PythonProject.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/heuristics/residual_packing.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/residual_packing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/heuristics/rrp_grasp.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/rrp_grasp.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/heuristics/rrp_column_generation.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/rrp_column_generation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/multi_inner_opt.py" beforeDir="false" afterPath="$PROJECT_DIR$/multi_inner_opt.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rrp_multi_round_output.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/rrp_multi_round_output.xlsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rrp_multi_round_template.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/rrp_multi_round_template.xlsx" afterDir="false" />
@@ -286,6 +290,11 @@
       <workItem from="1774942146435" duration="2872000" />
       <workItem from="1775709411989" duration="1226000" />
       <workItem from="1778513427817" duration="16222000" />
+      <workItem from="1779097774369" duration="8197000" />
+      <workItem from="1779115371586" duration="111000" />
+      <workItem from="1779153396555" duration="5592000" />
+      <workItem from="1779162127078" duration="14946000" />
+      <workItem from="1779204474429" duration="704000" />
     </task>
     <task id="LOCAL-00001" summary="测试">
       <option name="closed" value="true" />
@@ -353,11 +362,11 @@
     <SUITE FILE_PATH="coverage/two_stage$Test111.coverage" NAME="Test111 覆盖结果" MODIFIED="1773384386082" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$run_experiment.coverage" NAME="run_experiment 覆盖结果" MODIFIED="1773546905420" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$rrp_ga.coverage" NAME="rrp_ga 覆盖结果" MODIFIED="1773847396482" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
-    <SUITE FILE_PATH="coverage/two_stage$config.coverage" NAME="config 覆盖结果" MODIFIED="1778580842727" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$config.coverage" NAME="config 覆盖结果" MODIFIED="1779103059250" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$run_two_stage_experiment.coverage" NAME="run_two_stage_experiment 覆盖结果" MODIFIED="1773584755486" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$accurate_algorithm_MIQP.coverage" NAME="accurate_algorithm_MIQP 覆盖结果" MODIFIED="1761654784634" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$heart_drawing.coverage" NAME="heart_drawing 覆盖结果" MODIFIED="1774064520376" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/two_stage$multi_inner_opt.coverage" NAME="multi_inner_opt 覆盖结果" MODIFIED="1778867320512" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$multi_inner_opt.coverage" NAME="multi_inner_opt 覆盖结果" MODIFIED="1779199017456" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$Three_heuristic_algorithms.coverage" NAME="Three_heuristic_algorithms 覆盖结果" MODIFIED="1761655462139" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$main__1_.coverage" NAME="main (1) 覆盖结果" MODIFIED="1773498321063" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$.coverage" NAME="最新 覆盖结果" MODIFIED="1762095336866" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

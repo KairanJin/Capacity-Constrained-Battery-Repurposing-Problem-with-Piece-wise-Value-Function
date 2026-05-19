@@ -6,6 +6,12 @@ import pulp
 
 from utils import compute_delta, compute_group_reward
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from config import setup_gurobi_license
+setup_gurobi_license()
+
 try:
     import gurobipy as gp
     from gurobipy import GRB

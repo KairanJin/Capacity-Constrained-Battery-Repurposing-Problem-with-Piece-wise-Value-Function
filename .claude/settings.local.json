@@ -16,7 +16,23 @@
       "Bash(touch heuristics/hybrid_rl_ga.py heuristics/neural_rl.py heuristics/es_based_rrp.py)",
       "Bash(python:*)",
       "Bash(git add:*)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Read(//c/gurobi1001/win64/**)",
+      "Read(//c/Users/11504/**)",
+      "Bash(pip show *)",
+      "Bash(py -3.11 --version)",
+      "Bash(python3.11 --version)",
+      "Bash(py *)",
+      "Bash(conda create *)",
+      "Bash(conda activate *)",
+      "Bash(/c/Users/11504/.conda/envs/gurobi10/python.exe *)",
+      "Bash(cp *)",
+      "Bash(GRB_LICENSE_FILE=/c/gurobi1001/win64/bin/gurobi.lic /c/Users/11504/.conda/envs/gurobi10/python.exe *)",
+      "Bash(conda env *)",
+      "Bash(conda run *)",
+      "Bash(tasklist)",
+      "Bash(cat)",
+      "Bash(echo \"Started with PID $!\")"
     ]
   }
 }

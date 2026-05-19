@@ -11,16 +11,17 @@ class ExperimentConfig:
     run_column_generation: bool = False
     skip_cg_for_large_instances: bool = True
     cg_size_threshold: int = 1000
-    base_seed: int = 42
+    base_seed: int = 43
     verbose: bool = True
     run_lns: bool = True # Added for LNS
+    run_gurobi_exact: bool = False
 
 @dataclass
 class ProblemConfig:
     n_cells: int = 500
     K: int = 8
     k_max: int = 30
-    delta_bar: float = 0.2
+    delta_bar: float = 0.5
     w: Tuple[float, float] = (0.5, 0.5)
     lambda_penalty: float = 0.05
     theta1: float = 0.5  # Adjusted to align with data distribution
@@ -89,6 +90,47 @@ class CGConfig:
     max_new_cols: int = 20
 
 @dataclass
+class SAConfig:
+    initial_temperature: float | None = None
+    cooling_rate: float = 0.995
+    min_temperature: float = 1e-4
+    max_sa_iterations: int = 5000
+    vnd_interval: int = 200
+    max_vnd_rounds: int = 5
+    reheating_ratio: float = 3.0
+    reheating_stall: int = 500
+    max_reheats: int = 3
+    tabu_tenure: int = 25
+    n_init_starts: int = 5
+    kmeans_L1: int = 15
+    kmeans_tol: float = 1e-4
+    residual_rounds: int = 20
+
+import os
+
+# Gurobi license file path for the full (unrestricted) license
+# Located at Gurobi 10.0.1 installation, used with gurobipy 10.x in conda env `gurobi10`
+GUROBI_LICENSE_FILE = r"C:\gurobi1001\win64\bin\gurobi.lic"
+
+
+def setup_gurobi_license():
+    """Set the Gurobi license file environment variable before importing gurobipy."""
+    if os.path.isfile(GUROBI_LICENSE_FILE):
+        os.environ["GRB_LICENSE_FILE"] = GUROBI_LICENSE_FILE
+
+
+@dataclass
+class GurobiConfig:
+    time_limit: float = 3600.0
+    license_file: str = GUROBI_LICENSE_FILE
+    # delta_bar for Gurobi feasibility constraint (differs from problem.delta_bar
+    # which is used as penalty in heuristic objectives)
+    delta_bar: float = 0.8
+    # Smart sampling parameters
+    max_candidates: int = 200000
+    n_sampling_rounds: int = 500
+
+@dataclass
 class Config:
     experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
     problem: ProblemConfig = field(default_factory=ProblemConfig)
@@ -98,3 +140,5 @@ class Config:
     grasp: GRASPConfig = field(default_factory=GRASPConfig)
     ga: GAConfig = field(default_factory=GAConfig)
     cg: CGConfig = field(default_factory=CGConfig)
+    sa: SAConfig = field(default_factory=SAConfig)
+    gurobi: GurobiConfig = field(default_factory=GurobiConfig)

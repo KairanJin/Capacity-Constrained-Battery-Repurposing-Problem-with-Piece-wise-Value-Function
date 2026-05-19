@@ -12,6 +12,7 @@ from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_ga import solve_rrp_ga
 from heuristics.rrp_column_generation import solve_rrp_column_generation
 from heuristics.solve_rrp_lns import solve_rrp_lns
+from heuristics.rrp_gurobi_exact import solve_rrp_gurobi, GUROBI_AVAILABLE
 from utils import summarize_solution, safe_div
 
 
@@ -198,6 +199,32 @@ def main():
     if cfg.experiment.skip_cg_for_large_instances and cfg.problem.n_cells > cfg.experiment.cg_size_threshold:
         run_cg = False
 
+    if cfg.experiment.run_gurobi_exact:
+        if not GUROBI_AVAILABLE:
+            print("WARNING: gurobipy not installed, skipping RRP_GUROBI")
+        else:
+            res = solve_rrp_gurobi(
+                X=X,
+                K=cfg.problem.K,
+                k_t=k_t,
+                delta_bar=cfg.problem.delta_bar,
+                w=cfg.problem.w,
+                lambda_penalty=cfg.problem.lambda_penalty,
+                theta1=cfg.problem.theta1,
+                theta2=cfg.problem.theta2,
+                theta3=cfg.problem.theta3,
+                P1=cfg.problem.P1,
+                P2=cfg.problem.P2,
+                P3=cfg.problem.P3,
+                seed=seed,
+                method=cfg.gurobi.method,
+                time_limit=cfg.gurobi.time_limit,
+                mip_gap=cfg.gurobi.mip_gap,
+                threads=cfg.gurobi.threads,
+                max_enumeration=cfg.gurobi.max_enumeration,
+            )
+            results.append(enrich_result(res, X, cfg))
+
     if run_cg:
         res = solve_rrp_column_generation(
             X=X,
@@ -236,6 +263,8 @@ def main():
             "leftover": len(r["leftover"]),
             "tier_distribution": r["tier_distribution"],
             "n_columns": r.get("n_columns", float("nan")),
+            "gurobi_gap": r.get("gurobi_gap", float("nan")),
+            "n_feasible_groups": r.get("n_feasible_groups", float("nan")),
         }
         for r in results
     ])

@@ -19,6 +19,8 @@ from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
 from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_column_generation import solve_rrp_column_generation
 from heuristics.rrp_ms_kmeans_vns import solve_rrp_ms_kmeans_vns
+from heuristics.rrp_sa import solve_rrp_sa
+from heuristics.rrp_gurobi_exact import solve_rrp_gurobi_enumeration, solve_rrp_gurobi_mip, GUROBI_AVAILABLE
 from utils import safe_div, summarize_solution
 
 
@@ -28,7 +30,10 @@ METHODS = [
     "RRP_MS_KMEANS_VNS",
     # "RRP_GRASP",
     "RRP_GA",
-    "RRP_COLUMN_GENERATION",
+    "RRP_SA",
+    # "RRP_COLUMN_GENERATION",
+    # "RRP_GUROBI_MIP",
+    # "RRP_GUROBI_ENUM",  # skipped: C(n,K) too large for N>=50, K=8
 ]
 
 METHOD_LABELS = {
@@ -37,7 +42,10 @@ METHOD_LABELS = {
     "RRP_MS_KMEANS_VNS": "MS_KMeans_VNS",
     "RRP_GRASP": "GRASP",
     "RRP_GA": "GA",
+    "RRP_SA": "SA",
     "RRP_COLUMN_GENERATION": "ColumnGeneration",
+    "RRP_GUROBI_MIP": "Gurobi_MIP",
+    "RRP_GUROBI_ENUM": "Gurobi_Enum",
 }
 
 
@@ -239,6 +247,37 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             leftover_candidate_limit=cfg.ga.leftover_candidate_limit,
         )
 
+    elif method == "RRP_SA":
+        res = solve_rrp_sa(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
+            initial_temperature=cfg.sa.initial_temperature,
+            cooling_rate=cfg.sa.cooling_rate,
+            min_temperature=cfg.sa.min_temperature,
+            max_sa_iterations=cfg.sa.max_sa_iterations,
+            vnd_interval=cfg.sa.vnd_interval,
+            max_vnd_rounds=cfg.sa.max_vnd_rounds,
+            reheating_ratio=cfg.sa.reheating_ratio,
+            reheating_stall=cfg.sa.reheating_stall,
+            max_reheats=cfg.sa.max_reheats,
+            tabu_tenure=cfg.sa.tabu_tenure,
+            n_init_starts=cfg.sa.n_init_starts,
+            kmeans_L1=cfg.sa.kmeans_L1,
+            kmeans_tol=cfg.sa.kmeans_tol,
+            residual_rounds=cfg.sa.residual_rounds,
+        )
+
     elif method == "RRP_COLUMN_GENERATION":
         # solve_rrp_column_generation.py 中已经设置了默认参数：
         # max_cg_iter=30, init_n_starts=30, pricing_n_seeds=40 等。
@@ -263,6 +302,68 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             use_gurobi_pricing=True,
         )
 
+    elif method == "RRP_GUROBI_MIP":
+        if not GUROBI_AVAILABLE:
+            print(f"WARNING: gurobipy not installed, skipping {method} (round {seed // 100})")
+            res = make_empty_result(method, X)
+        else:
+            n_cells_total = X.shape[0]
+            print(f"  [{method}] N={n_cells_total}, K={cfg.problem.K}, k_t={k_t}, "
+                  f"delta_bar={cfg.gurobi.delta_bar}, time_limit={cfg.gurobi.time_limit}s")
+            res = solve_rrp_gurobi_mip(
+                X=X,
+                K=cfg.problem.K,
+                k_t=k_t,
+                delta_bar=cfg.gurobi.delta_bar,
+                w=cfg.problem.w,
+                lambda_penalty=cfg.problem.lambda_penalty,
+                theta1=cfg.problem.theta1,
+                theta2=cfg.problem.theta2,
+                theta3=cfg.problem.theta3,
+                P1=cfg.problem.P1,
+                P2=cfg.problem.P2,
+                P3=cfg.problem.P3,
+                seed=seed,
+                time_limit=cfg.gurobi.time_limit,
+            )
+
+    elif method == "RRP_GUROBI_ENUM":
+        if not GUROBI_AVAILABLE:
+            print(f"WARNING: gurobipy not installed, skipping {method} (round {seed // 100})")
+            res = make_empty_result(method, X)
+            # Compute C(n,K) to explain why we skipped
+            from math import comb
+            n_comb = comb(X.shape[0], cfg.problem.K)
+            print(f"  C({X.shape[0]},{cfg.problem.K}) = {n_comb}")
+        else:
+            from math import comb
+            n_cells_total = X.shape[0]
+            n_comb = comb(n_cells_total, cfg.problem.K)
+            print(f"  [{method}] C({n_cells_total},{cfg.problem.K}) = {n_comb}, time_limit={cfg.gurobi.time_limit}s, delta_bar={cfg.gurobi.delta_bar}")
+            # 规模过大时直接跳过，避免内存溢出
+            if n_comb > 50_000_000:
+                print(f"  [{method}] Skipping: C(n,K)={n_comb} too large (>50M)")
+                res = make_empty_result(method, X)
+                res["n_columns"] = float(n_comb)
+            else:
+                res = solve_rrp_gurobi_enumeration(
+                    X=X,
+                    K=cfg.problem.K,
+                    k_t=k_t,
+                    delta_bar=cfg.gurobi.delta_bar,
+                    w=cfg.problem.w,
+                    lambda_penalty=cfg.problem.lambda_penalty,
+                    theta1=cfg.problem.theta1,
+                    theta2=cfg.problem.theta2,
+                    theta3=cfg.problem.theta3,
+                    P1=cfg.problem.P1,
+                    P2=cfg.problem.P2,
+                    P3=cfg.problem.P3,
+                    seed=seed,
+                    time_limit=cfg.gurobi.time_limit,
+                    max_groups=5000000,
+                )
+
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -273,6 +374,7 @@ def run_multi_round_experiment(
     n_rounds: int = 20,
     arrivals_per_round: int = 130,
     output_excel_path: str = "rrp_multi_round_output.xlsx",
+    base_seed_override: int | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     多轮重组逻辑：
@@ -288,7 +390,7 @@ def run_multi_round_experiment(
     - pool_by_method 中保存的 leftover 也是标准化后的数据
     """
     cfg = Config()
-    base_seed = cfg.experiment.base_seed
+    base_seed = base_seed_override if base_seed_override is not None else cfg.experiment.base_seed
 
     pool_by_method: Dict[str, np.ndarray | None] = {m: None for m in METHODS}
     cumulative_reward_by_method: Dict[str, float] = {m: 0.0 for m in METHODS}
@@ -394,6 +496,8 @@ def run_multi_round_experiment(
                     "P0_cells": int(tier_counts.get("P0", 0) * cfg.problem.K),
                     "tier_distribution": result["tier_distribution"],
                     "n_columns": result.get("n_columns", float("nan")),
+                    "gurobi_gap": result.get("gurobi_gap", float("nan")),
+                    "n_feasible_groups": result.get("n_feasible_groups", float("nan")),
                 }
             )
 
@@ -472,6 +576,7 @@ def create_excel_template_only(
             "utilization_rate", "avg_delta", "avg_phi", "reward_per_pack",
             "positive_pack_ratio", "P1_packs", "P2_packs", "P3_packs", "P0_packs",
             "P1_cells", "P2_cells", "P3_cells", "P0_cells", "tier_distribution", "n_columns",
+            "gurobi_gap", "n_feasible_groups",
         ]
     )
     empty_summary = pd.DataFrame(
@@ -555,6 +660,8 @@ def export_results_to_excel(
                         "P0_cells": None,
                         "tier_distribution": None,
                         "n_columns": None,
+                        "gurobi_gap": None,
+                        "n_feasible_groups": None,
                     }
                 )
         detail_df_to_write = pd.DataFrame(rows)
@@ -569,7 +676,7 @@ def export_results_to_excel(
         {
             1: 8, 2: 24, 3: 20, 4: 12, 5: 12, 6: 14, 7: 18, 8: 12, 9: 10, 10: 12,
             11: 14, 12: 14, 13: 12, 14: 12, 15: 16, 16: 18, 17: 10, 18: 10, 19: 10,
-            20: 10, 21: 10, 22: 10, 23: 10, 24: 10, 25: 28, 26: 12,
+            20: 10, 21: 10, 22: 10, 23: 10, 24: 10, 25: 28, 26: 12, 27: 12, 28: 18,
         },
     )
 
@@ -766,24 +873,55 @@ def export_results_to_excel(
     wb.save(output_path)
 
 
+def run_one_experiment_with_seed(seed: int, n_rounds: int = 10, arrivals_per_round: int = 400) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    """使用指定的 base_seed 跑一轮多轮重组实验，结果保存到带时间戳的 Excel 文件中。"""
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = f"rrp_multi_round_seed{seed}_{timestamp}.xlsx"
+
+    print(f"\n{'='*60}")
+    print(f"Starting experiment with base_seed={seed}")
+    print(f"Output file: {output_path}")
+    print(f"{'='*60}")
+
+    detail_df, summary_df = run_multi_round_experiment(
+        n_rounds=n_rounds,
+        arrivals_per_round=arrivals_per_round,
+        output_excel_path=output_path,
+        base_seed_override=seed,
+    )
+
+    return detail_df, summary_df, output_path
+
+
 def main():
     # 1) 生成可直接复用的空模板
     create_excel_template_only("rrp_multi_round_template.xlsx", n_rounds=20)
 
-    # 2) 实际跑实验，并输出结果到 Excel
-    detail_df, summary_df = run_multi_round_experiment(
-        n_rounds=10,
-        arrivals_per_round=400,
-        output_excel_path="rrp_multi_round_output.xlsx",
-    )
+    # 2) 用 10 个不同的随机种子跑实验，每次结果保存到不同的 Excel
+    n_runs = 10
+    all_results = []
 
-    print("\n=== Multi-round Detail (head) ===")
-    with pd.option_context("display.max_columns", None, "display.width", 260):
-        print(detail_df.head(15).to_string(index=False))
+    for i in range(n_runs):
+        seed = 42 + i * 7  # 每次使用不同的种子值
+        detail_df, summary_df, output_path = run_one_experiment_with_seed(
+            seed=seed,
+            n_rounds=10,
+            arrivals_per_round=400,
+        )
+        all_results.append((seed, output_path, summary_df))
 
-    print("\n=== Multi-round Summary ===")
-    with pd.option_context("display.max_columns", None, "display.width", 260):
-        print(summary_df.to_string(index=False))
+        print(f"\n=== Run {i+1}/{n_runs} completed (seed={seed}) => {output_path} ===")
+        with pd.option_context("display.max_columns", None, "display.width", 260):
+            print(summary_df.to_string(index=False))
+
+    # 3) 汇总打印所有实验的最终结果
+    print(f"\n{'='*60}")
+    print(f"All {n_runs} experiments completed.")
+    print(f"{'='*60}")
+    for seed, output_path, _ in all_results:
+        print(f"  seed={seed:4d} => {output_path}")
 
 
 if __name__ == "__main__":
