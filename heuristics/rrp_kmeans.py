@@ -60,6 +60,46 @@ def _assign_to_nearest_nonfull(X, centers, K):
     return groups, leftover
 
 
+def _balanced_assign_all(X, centers, K):
+    """Assign ALL n cells to groups of exactly K cells each. Groups that can't
+    be filled to K leave their cells as leftover (size < K)."""
+    n = X.shape[0]
+    k = len(centers)
+
+    # Phase 1: greedy nearest-nonfull
+    groups, leftover = _assign_to_nearest_nonfull(X, centers, K)
+
+    # Phase 2: re-assign leftover cells to incomplete groups
+    # Collect cells from groups that are not full K
+    incomplete_groups = [(gid, g) for gid, g in enumerate(groups) if len(g) < K and len(g) > 0]
+    if incomplete_groups and leftover:
+        # Merge all incomplete + leftover into a pool and re-assign
+        pool_cells = []
+        keep_groups = []
+        for gid, g in enumerate(groups):
+            if len(g) == K:
+                keep_groups.append(g)
+            else:
+                pool_cells.extend(g)
+        pool_cells.extend(leftover)
+
+        # Re-run assignment with remaining capacity
+        subX = X[pool_cells]
+        sub_centers = centers[np.array([gid for gid, g in enumerate(groups) if len(g) < K])]
+        if len(sub_centers) > 0:
+            sub_groups, sub_leftover = _assign_to_nearest_nonfull(subX, sub_centers, K)
+            for i, sg in enumerate(sub_groups):
+                mapped = [pool_cells[idx] for idx in sg]
+                if mapped:
+                    keep_groups.append(mapped)
+            leftover = [pool_cells[idx] for idx in sub_leftover]
+        else:
+            leftover = pool_cells
+        groups = keep_groups
+
+    return groups, leftover
+
+
 def _update_centers(X, groups, centers):
     new_centers = centers.copy()
     for j, g in enumerate(groups):
@@ -68,7 +108,9 @@ def _update_centers(X, groups, centers):
     return new_centers
 
 
-def _recluster_incomplete_groups(X, groups, K, seed=0):
+def _recluster_incomplete_groups(X, groups, K, delta_bar=None, seed=0):
+    """Collect incomplete cells and try to form delta-feasible packs via
+    k-means clustering."""
     incomplete_cells = []
     full_groups = []
 
@@ -102,7 +144,8 @@ def _recluster_incomplete_groups(X, groups, K, seed=0):
 
     leftover = [incomplete_cells[idx] for idx in rem_local]
     if leftover:
-        new_groups.append(leftover)
+        for cell in leftover:
+            new_groups.append([cell])
 
     return new_groups
 
@@ -236,11 +279,15 @@ def solve_rrp_kmeans(
             "runtime": time.perf_counter() - start,
         }
 
+    # Ensure enough centers to cover all cells. k_t is a minimum; we need
+    # at least ceil(n / K) centers so every cell can be assigned to a group.
+    n_centers = max(k_t, (n + K - 1) // K)
+
     rng = np.random.default_rng(seed)
-    init_idx = rng.choice(n, size=k_t, replace=False)
+    init_idx = rng.choice(n, size=n_centers, replace=False)
     centers = X[init_idx].copy()
 
-    groups = [[] for _ in range(k_t)]
+    groups = [[] for _ in range(n_centers)]
     leftover = list(range(n))
 
     # Stage 1: SSE-style initialization
@@ -253,16 +300,6 @@ def solve_rrp_kmeans(
         if shift < tol:
             break
 
-    # regroup incomplete groups
-    while True:
-        incomplete_total = sum(len(g) for g in groups if len(g) < K)
-        if incomplete_total < K:
-            break
-        new_groups = _recluster_incomplete_groups(X, groups, K, seed=seed if seed is not None else 0)
-        if len(new_groups) == len(groups):
-            break
-        groups = new_groups
-
     # Stage 2: reward-improving swap
     for _ in range(L2):
         groups, improved = _try_reward_improving_swap(
@@ -272,7 +309,23 @@ def solve_rrp_kmeans(
         if not improved:
             break
 
-    # final feasibility filter
+    # Merge leftover cells into groups so regroup can see them.
+    # Split into groups of 1 so each is treated as incomplete (len < K).
+    if leftover:
+        for cell in sorted(leftover):
+            groups.append([cell])
+
+    # regroup incomplete groups
+    while True:
+        incomplete_total = sum(len(g) for g in groups if len(g) < K)
+        if incomplete_total < K:
+            break
+        new_groups = _recluster_incomplete_groups(X, groups, K, delta_bar=delta_bar, seed=seed if seed is not None else 0)
+        if len(new_groups) == len(groups):
+            break
+        groups = new_groups
+
+    # final feasibility filter — keep at most k_t groups
     feasible_groups = []
     used = set()
 
@@ -281,6 +334,8 @@ def solve_rrp_kmeans(
     deltas = []
 
     for g in groups:
+        if len(feasible_groups) >= k_t:
+            break
         if len(g) != K:
             continue
         delta = compute_delta(X, g)

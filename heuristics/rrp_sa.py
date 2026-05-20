@@ -51,7 +51,9 @@ def _assign_to_nearest_nonfull(X, centers, K):
 def _kmeans_solution(X, K, k_t, L1, tol, seed):
     rng = np.random.default_rng(seed)
     n = X.shape[0]
-    init_idx = rng.choice(n, size=k_t, replace=False)
+    # Ensure enough centers so every cell can be assigned.
+    n_centers = max(k_t, (n + K - 1) // K)
+    init_idx = rng.choice(n, size=n_centers, replace=False)
     centers = X[init_idx].copy()
     for _ in range(L1):
         groups, _ = _assign_to_nearest_nonfull(X, centers, K)
@@ -539,10 +541,15 @@ def solve_rrp_sa(
         feasible = []
         used = set()
         for g in groups:
+            if len(feasible) >= k_t:
+                used.update(g)
+                continue
             r, feas = _evaluate_group_simple(X, g, K, delta_bar, w_arr, lambda_penalty,
                                               theta1, theta2, theta3, P1, P2, P3)
             if feas:
                 feasible.append(sorted(g))
+                used.update(g)
+            else:
                 used.update(g)
         candidates.append((feasible, sorted(set(range(n)) - used)))
 

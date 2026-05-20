@@ -20,8 +20,8 @@ class ExperimentConfig:
 class ProblemConfig:
     n_cells: int = 500
     K: int = 8
-    k_max: int = 30
-    delta_bar: float = 0.5
+    k_max: int = 80
+    delta_bar: float = 0.8
     w: Tuple[float, float] = (0.5, 0.5)
     lambda_penalty: float = 0.05
     theta1: float = 0.5  # Adjusted to align with data distribution

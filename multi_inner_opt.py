@@ -908,7 +908,7 @@ def main():
         detail_df, summary_df, output_path = run_one_experiment_with_seed(
             seed=seed,
             n_rounds=10,
-            arrivals_per_round=400,
+            arrivals_per_round=500,
         )
         all_results.append((seed, output_path, summary_df))
 

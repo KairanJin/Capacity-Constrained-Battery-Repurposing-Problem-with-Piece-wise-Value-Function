@@ -128,21 +128,24 @@ def _group_priority_score(info):
     return 0.7 * reward_term + 0.3 * gap_term
 
 
-def _select_candidate_group_ids(infos, top_q):
-    full_feasible_ids = [i for i, info in enumerate(infos) if info["feasible"]]
+def _select_candidate_group_ids(infos, top_q, theta1):
+    """
+    仅从 P2 / P3 级别的组中选择候选组，P1 组不参与 VNS 搜索。
+    """
+    feasible_ids = [i for i, info in enumerate(infos) if info["feasible"] and info["phi"] < theta1]
     ranked = sorted(
-        full_feasible_ids,
+        feasible_ids,
         key=lambda i: _group_priority_score(infos[i]),
         reverse=True,
     )
     return ranked[:min(top_q, len(ranked))]
 
 
-def _nearest_partner_group_ids(infos, gid, top_q):
+def _nearest_partner_group_ids(infos, gid, top_q, theta1):
     mu = infos[gid]["mu"]
     candidates = []
     for j, info in enumerate(infos):
-        if j == gid or not info["feasible"]:
+        if j == gid or not info["feasible"] or info["phi"] >= theta1:
             continue
         d = float(np.sum((mu - info["mu"]) ** 2))
         candidates.append((d, j))
@@ -249,10 +252,13 @@ def _initial_kmeans_solution(X, K, k_t, L1, tol, seed):
     rng = np.random.default_rng(seed)
     n = X.shape[0]
 
-    init_idx = rng.choice(n, size=k_t, replace=False)
+    # Ensure enough centers so every cell can be assigned (len < k_t * K leaves orphans).
+    n_centers = max(k_t, (n + K - 1) // K)
+
+    init_idx = rng.choice(n, size=n_centers, replace=False)
     centers = X[init_idx].copy()
 
-    groups = [[] for _ in range(k_t)]
+    groups = [[] for _ in range(n_centers)]
 
     for _ in range(L1):
         groups, _ = _assign_to_nearest_nonfull(X, centers, K)
@@ -273,6 +279,7 @@ def _extract_feasible_groups_and_leftover(
     groups,
     leftover,
     K,
+    k_t,
     delta_bar,
     w,
     lambda_penalty,
@@ -284,13 +291,16 @@ def _extract_feasible_groups_and_leftover(
     P3,
 ):
     """
-    Keep only feasible full groups.
+    Keep only feasible full groups, capped at k_t.
     Everything else goes to leftover.
     """
     feasible_groups = []
     used = set(leftover)
 
     for g in groups:
+        if len(feasible_groups) >= k_t:
+            used.update(g)
+            continue
         info = _evaluate_group_info(
             X, g, K, delta_bar, w, lambda_penalty,
             theta1, theta2, theta3, P1, P2, P3
@@ -358,10 +368,10 @@ def _n1_swap_first_improvement(
     partner_limit,
     cell_candidate_limit,
 ):
-    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit)
+    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit, theta1)
 
     for a in cand_ids:
-        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit)
+        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit, theta1)
         g1 = groups[a]
         mu1 = infos[a]["mu"]
         idxs1 = _ordered_cells_in_group(X, g1, mu1, cell_candidate_limit)
@@ -424,7 +434,7 @@ def _n2_leftover_swap_first_improvement(
     if len(leftover) == 0:
         return False
 
-    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit)
+    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit, theta1)
 
     for a in cand_ids:
         g = groups[a]
@@ -478,10 +488,10 @@ def _n3_exchange22_first_improvement(
     if K < 2:
         return False
 
-    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit)
+    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit, theta1)
 
     for a in cand_ids:
-        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit)
+        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit, theta1)
         g1 = groups[a]
         mu1 = infos[a]["mu"]
         idxs1 = _ordered_cells_in_group(X, g1, mu1, cell_candidate_limit)
@@ -561,7 +571,7 @@ def _n4_destroy_repair(
     destroy_size,
     pack_candidate_limit,
 ):
-    cand_ids = _select_candidate_group_ids(infos, max(pack_candidate_limit, destroy_size))
+    cand_ids = _select_candidate_group_ids(infos, max(pack_candidate_limit, destroy_size), theta1)
     if len(cand_ids) == 0:
         return False, groups, leftover
 
@@ -616,10 +626,10 @@ def _n5_merge_split(
     pack_candidate_limit,
     partner_limit,
 ):
-    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit)
+    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit, theta1)
 
     for a in cand_ids:
-        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit)
+        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit, theta1)
 
         for b in partner_ids:
             if b <= a:
@@ -721,7 +731,7 @@ def solve_rrp_kmeans_vns(
     )
 
     groups, leftover = _extract_feasible_groups_and_leftover(
-        X, raw_groups, raw_leftover, K, delta_bar, w, lambda_penalty,
+        X, raw_groups, raw_leftover, K, k_t, delta_bar, w, lambda_penalty,
         theta1, theta2, theta3, P1, P2, P3
     )
 

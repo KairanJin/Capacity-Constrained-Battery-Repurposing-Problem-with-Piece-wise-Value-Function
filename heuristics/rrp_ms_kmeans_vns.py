@@ -78,9 +78,11 @@ def _recluster_incomplete_groups(X, groups, K, seed=0):
 def _kmeans_init(X, K, k_t, L1, tol, seed):
     rng = np.random.default_rng(seed)
     n = X.shape[0]
-    init_idx = rng.choice(n, size=k_t, replace=False)
+    # Ensure enough centers so every cell can be assigned.
+    n_centers = max(k_t, (n + K - 1) // K)
+    init_idx = rng.choice(n, size=n_centers, replace=False)
     centers = X[init_idx].copy()
-    groups = [[] for _ in range(k_t)]
+    groups = [[] for _ in range(n_centers)]
     for _ in range(L1):
         groups, _ = _assign_to_nearest_nonfull(X, centers, K)
         new_centers = np.zeros_like(centers)
@@ -155,15 +157,20 @@ def _evaluate_group_info(X, group, K, delta_bar, w, lambda_penalty,
             "delta": delta, "mu": mu, "gap_to_next": gap}
 
 
-def _extract_feasible_and_leftover(X, groups, K, delta_bar, w, lambda_penalty,
+def _extract_feasible_and_leftover(X, groups, K, k_t, delta_bar, w, lambda_penalty,
                                     theta1, theta2, theta3, P1, P2, P3):
     feasible = []
     used = set()
     for g in groups:
+        if len(feasible) >= k_t:
+            used.update(g)
+            continue
         info = _evaluate_group_info(X, g, K, delta_bar, w, lambda_penalty,
                                      theta1, theta2, theta3, P1, P2, P3)
         if info["feasible"]:
             feasible.append(sorted(g))
+            used.update(g)
+        else:
             used.update(g)
     leftover = [i for i in range(X.shape[0]) if i not in used]
     return feasible, sorted(leftover)
@@ -496,7 +503,7 @@ def _run_vns(X, groups, leftover, K, k_t, delta_bar, w, lambda_penalty,
              pack_candidate_limit, partner_limit, cell_candidate_limit,
              leftover_candidate_limit, destroy_size):
     groups, leftover = _extract_feasible_and_leftover(
-        X, groups, K, delta_bar, w, lambda_penalty,
+        X, groups, K, k_t, delta_bar, w, lambda_penalty,
         theta1, theta2, theta3, P1, P2, P3)
     infos, total_reward = _recompute_all_infos(
         X, groups, K, delta_bar, w, lambda_penalty,
