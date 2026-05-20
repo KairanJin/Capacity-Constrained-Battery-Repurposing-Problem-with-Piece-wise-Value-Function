@@ -626,10 +626,13 @@ def _n5_merge_split(
     pack_candidate_limit,
     partner_limit,
 ):
-    cand_ids = _select_candidate_group_ids(infos, pack_candidate_limit, theta1)
+    # Hard-limit partner to 2 for K=8 to avoid C(16,8)=12870 explosion
+    effective_partner = min(partner_limit, 2)
+    # Only check top 3 worst packs to limit enumeration cost
+    cand_ids = _select_candidate_group_ids(infos, min(pack_candidate_limit, 3), theta1)
 
     for a in cand_ids:
-        partner_ids = _nearest_partner_group_ids(infos, a, partner_limit, theta1)
+        partner_ids = _nearest_partner_group_ids(infos, a, effective_partner, theta1)
 
         for b in partner_ids:
             if b <= a:
@@ -640,8 +643,8 @@ def _n5_merge_split(
             pool = g1 + g2
             old_sum = infos[a]["reward"] + infos[b]["reward"]
 
-            # exact balanced partition enumeration over 2K cells
-            # for K=4, this is only C(8,4)=70
+            # First-improvement: return on first better split found
+            # for K=8, C(16,8)=12870, halved to ~6435 by symmetry break
             for subset in itertools.combinations(pool, K):
                 subset = set(subset)
                 new_g1 = sorted(list(subset))
@@ -701,7 +704,8 @@ def solve_rrp_kmeans_vns(
     cell_candidate_limit: int = 3,
     leftover_candidate_limit: int = 12,
     destroy_size: int = 2,
-    enable_n5: bool = False,   # 新增：默认关闭 N5 merge-split
+    enable_n5: bool = False,
+    n_starts: int = 1,
 ):
     start = time.perf_counter()
     n = X.shape[0]
@@ -719,147 +723,141 @@ def solve_rrp_kmeans_vns(
         }
 
     seed_val = 0 if seed is None else seed
+    rng = np.random.default_rng(seed_val)
 
-    # 1) Initial K-means solution
-    raw_groups, raw_leftover = _initial_kmeans_solution(
-        X=X,
-        K=K,
-        k_t=k_t,
-        L1=L1,
-        tol=tol,
-        seed=seed_val,
-    )
+    best_groups, best_leftover, best_reward = [], list(range(n)), -np.inf
 
-    groups, leftover = _extract_feasible_groups_and_leftover(
-        X, raw_groups, raw_leftover, K, k_t, delta_bar, w, lambda_penalty,
-        theta1, theta2, theta3, P1, P2, P3
-    )
+    for start_idx in range(n_starts):
+        s = int(rng.integers(1, 2**31))
 
-    infos, total_reward = _recompute_all_infos(
-        X, groups, K, delta_bar, w, lambda_penalty,
-        theta1, theta2, theta3, P1, P2, P3
-    )
+        # 1) Initial K-means solution
+        raw_groups, raw_leftover = _initial_kmeans_solution(
+            X=X, K=K, k_t=k_t, L1=L1, tol=tol, seed=s,
+        )
 
-    no_improve_rounds = 0
-    it = 0
+        groups, leftover = _extract_feasible_groups_and_leftover(
+            X, raw_groups, raw_leftover, K, k_t, delta_bar, w, lambda_penalty,
+            theta1, theta2, theta3, P1, P2, P3
+        )
 
-    while it < max_vns_iter and no_improve_rounds < max_no_improve:
-        improved = False
+        infos, total_reward = _recompute_all_infos(
+            X, groups, K, delta_bar, w, lambda_penalty,
+            theta1, theta2, theta3, P1, P2, P3
+        )
 
-        # -------------------------------------------------
-        # Phase A: light neighborhoods only (N1, N2, N3)
-        # first-improvement + local incremental evaluation
-        # -------------------------------------------------
-        while True:
-            light_improved = False
+        no_improve_rounds = 0
+        it = 0
 
-            if _n1_swap_first_improvement(
-                X, groups, infos, total_reward, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3,
-                pack_candidate_limit, partner_limit, cell_candidate_limit
-            ):
-                infos, total_reward = _recompute_all_infos(
-                    X, groups, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
+        while it < max_vns_iter and no_improve_rounds < max_no_improve:
+            improved = False
+
+            # -------------------------------------------------
+            # Phase A: light neighborhoods only (N1, N2, N3)
+            # -------------------------------------------------
+            while True:
+                light_improved = False
+
+                if _n1_swap_first_improvement(
+                    X, groups, infos, total_reward, K, delta_bar, w, lambda_penalty,
+                    theta1, theta2, theta3, P1, P2, P3,
+                    pack_candidate_limit, partner_limit, cell_candidate_limit
+                ):
+                    infos, total_reward = _recompute_all_infos(
+                        X, groups, K, delta_bar, w, lambda_penalty,
+                        theta1, theta2, theta3, P1, P2, P3
+                    )
+                    light_improved = True
+                    improved = True
+                    continue
+
+                if _n2_leftover_swap_first_improvement(
+                    X, groups, infos, leftover, K, delta_bar, w, lambda_penalty,
+                    theta1, theta2, theta3, P1, P2, P3,
+                    pack_candidate_limit, cell_candidate_limit, leftover_candidate_limit
+                ):
+                    infos, total_reward = _recompute_all_infos(
+                        X, groups, K, delta_bar, w, lambda_penalty,
+                        theta1, theta2, theta3, P1, P2, P3
+                    )
+                    light_improved = True
+                    improved = True
+                    continue
+
+                if _n3_exchange22_first_improvement(
+                    X, groups, infos, K, delta_bar, w, lambda_penalty,
+                    theta1, theta2, theta3, P1, P2, P3,
+                    pack_candidate_limit, partner_limit, cell_candidate_limit
+                ):
+                    infos, total_reward = _recompute_all_infos(
+                        X, groups, K, delta_bar, w, lambda_penalty,
+                        theta1, theta2, theta3, P1, P2, P3
+                    )
+                    light_improved = True
+                    improved = True
+                    continue
+
+                if not light_improved:
+                    break
+
+            # -------------------------------------------------
+            # Phase B: heavy neighborhood N4
+            # -------------------------------------------------
+            if not improved:
+                found_n4, new_groups, new_leftover = _n4_destroy_repair(
+                    X, groups, infos, leftover, total_reward,
+                    K, k_t, delta_bar, w, lambda_penalty,
+                    theta1, theta2, theta3, P1, P2, P3,
+                    destroy_size, pack_candidate_limit
                 )
-                light_improved = True
-                improved = True
-                continue
+                if found_n4:
+                    groups, leftover = new_groups, new_leftover
+                    infos, total_reward = _recompute_all_infos(
+                        X, groups, K, delta_bar, w, lambda_penalty,
+                        theta1, theta2, theta3, P1, P2, P3
+                    )
+                    improved = True
 
-            if _n2_leftover_swap_first_improvement(
-                X, groups, infos, leftover, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3,
-                pack_candidate_limit, cell_candidate_limit, leftover_candidate_limit
-            ):
-                infos, total_reward = _recompute_all_infos(
-                    X, groups, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
+            # -------------------------------------------------
+            # Phase C: optional N5 merge-split
+            # -------------------------------------------------
+            if enable_n5 and not improved:
+                found_n5, new_groups, new_leftover = _n5_merge_split(
+                    X, groups, infos, leftover, K, delta_bar, w, lambda_penalty,
+                    theta1, theta2, theta3, P1, P2, P3,
+                    pack_candidate_limit, partner_limit
                 )
-                light_improved = True
-                improved = True
-                continue
+                if found_n5:
+                    groups, leftover = new_groups, new_leftover
+                    infos, total_reward = _recompute_all_infos(
+                        X, groups, K, delta_bar, w, lambda_penalty,
+                        theta1, theta2, theta3, P1, P2, P3
+                    )
+                    improved = True
 
-            if _n3_exchange22_first_improvement(
-                X, groups, infos, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3,
-                pack_candidate_limit, partner_limit, cell_candidate_limit
-            ):
-                infos, total_reward = _recompute_all_infos(
-                    X, groups, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
-                )
-                light_improved = True
-                improved = True
-                continue
+            if improved:
+                no_improve_rounds = 0
+            else:
+                no_improve_rounds += 1
+            it += 1
 
-            if not light_improved:
-                break
-
-        # -------------------------------------------------
-        # Phase B: heavy neighborhood N4
-        # -------------------------------------------------
-        if not improved:
-            found_n4, new_groups, new_leftover = _n4_destroy_repair(
-                X, groups, infos, leftover, total_reward,
-                K, k_t, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3,
-                destroy_size, pack_candidate_limit
-            )
-            if found_n4:
-                groups, leftover = new_groups, new_leftover
-                infos, total_reward = _recompute_all_infos(
-                    X, groups, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
-                )
-                improved = True
-
-        # -------------------------------------------------
-        # Phase C: optional N5 merge-split
-        # 默认关闭，因为 K=8 时 C(16,8)=12870，计算量很大
-        # -------------------------------------------------
-        if enable_n5 and not improved:
-            found_n5, new_groups, new_leftover = _n5_merge_split(
-                X, groups, infos, leftover, K, delta_bar, w, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3,
-                pack_candidate_limit, partner_limit
-            )
-            if found_n5:
-                groups, leftover = new_groups, new_leftover
-                infos, total_reward = _recompute_all_infos(
-                    X, groups, K, delta_bar, w, lambda_penalty,
-                    theta1, theta2, theta3, P1, P2, P3
-                )
-                improved = True
-
-        if improved:
-            no_improve_rounds = 0
-        else:
-            no_improve_rounds += 1
-
-        it += 1
+        if total_reward > best_reward:
+            best_reward = total_reward
+            best_groups = [g[:] for g in groups]
+            best_leftover = leftover[:]
 
     summary = summarize_solution(
-        X=X,
-        groups=groups,
-        K=K,
-        w=w,
-        lambda_penalty=lambda_penalty,
-        theta1=theta1,
-        theta2=theta2,
-        theta3=theta3,
-        P1=P1,
-        P2=P2,
-        P3=P3,
+        X=X, groups=best_groups, K=K, w=w, lambda_penalty=lambda_penalty,
+        theta1=theta1, theta2=theta2, theta3=theta3, P1=P1, P2=P2, P3=P3,
     )
 
     used = set()
-    for g in groups:
+    for g in best_groups:
         used.update(g)
     leftover = [i for i in range(n) if i not in used]
 
     return {
         "method": "RRP_KMEANS_VNS",
-        "groups": groups,
+        "groups": best_groups,
         "leftover": leftover,
         "reward": summary["total_reward"],
         "n_packs": summary["n_packs"],

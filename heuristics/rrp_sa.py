@@ -336,13 +336,17 @@ def _apply_2exchange(groups, stats_list, a, b, pos_a1, pos_a2, pos_b1, pos_b2,
 
 def _vnd_intensification(groups, leftover, X, K, k_t, delta_bar, w, lambda_penalty,
                           theta1, theta2, theta3, P1, P2, P3,
-                          X_sq_norms, w_dot_X, max_vnd_rounds=10):
+                          X_sq_norms, w_dot_X, max_vnd_rounds=3, sample_limit_n1=50, sample_limit_n2=200, rng=None):
     """
-    Variable Neighborhood Descent: systematically search N1 then N2 with
+    Variable Neighborhood Descent: sampled search N1 then N2 with
     best-improvement acceptance until no improvement.
+    Instead of exhaustive enumeration, randomly sample pack pairs and leftover candidates.
     """
     if len(groups) == 0:
         return groups, leftover
+
+    if rng is None:
+        rng = np.random.default_rng(0)
 
     stats_list = _build_stats_list(groups, X, X_sq_norms, w_dot_X)
     total_reward, infos = _recompute_all_rewards(
@@ -350,27 +354,36 @@ def _vnd_intensification(groups, leftover, X, K, k_t, delta_bar, w, lambda_penal
         theta1, theta2, theta3, P1, P2, P3,
     )
 
+    n_groups = len(groups)
+
     for _ in range(max_vnd_rounds):
-        # N1: best 1-1 swap
+        # N1: best 1-1 swap (sampled pack pairs)
         best_dE = 0.0
         best_move = None
 
-        for a in range(len(groups)):
-            for b in range(a + 1, len(groups)):
-                for pa in range(len(groups[a])):
-                    for pb in range(len(groups[b])):
-                        cell_a = groups[a][pa]
-                        cell_b = groups[b][pb]
-                        nr_a, nr_b, fa, fb = _swap_rewards(
-                            stats_list[a], stats_list[b], cell_a, cell_b, X, X_sq_norms, w_dot_X,
-                            lambda_penalty, delta_bar, theta1, theta2, theta3, P1, P2, P3,
-                        )
-                        if not fa or not fb:
-                            continue
-                        dE = (nr_a + nr_b) - (infos[a]["reward"] + infos[b]["reward"])
-                        if dE > best_dE + 1e-12:
-                            best_dE = dE
-                            best_move = ('swap', a, b, pa, pb, cell_a, cell_b)
+        # Generate all possible pack pairs, then sample
+        all_pairs = [(a, b) for a in range(n_groups) for b in range(a + 1, n_groups)]
+        n_pairs = len(all_pairs)
+        sampled_pairs = all_pairs
+        if n_pairs > sample_limit_n1:
+            indices = rng.choice(n_pairs, size=sample_limit_n1, replace=False)
+            sampled_pairs = [all_pairs[i] for i in indices]
+
+        for a, b in sampled_pairs:
+            for pa in range(len(groups[a])):
+                for pb in range(len(groups[b])):
+                    cell_a = groups[a][pa]
+                    cell_b = groups[b][pb]
+                    nr_a, nr_b, fa, fb = _swap_rewards(
+                        stats_list[a], stats_list[b], cell_a, cell_b, X, X_sq_norms, w_dot_X,
+                        lambda_penalty, delta_bar, theta1, theta2, theta3, P1, P2, P3,
+                    )
+                    if not fa or not fb:
+                        continue
+                    dE = (nr_a + nr_b) - (infos[a]["reward"] + infos[b]["reward"])
+                    if dE > best_dE + 1e-12:
+                        best_dE = dE
+                        best_move = ('swap', a, b, pa, pb, cell_a, cell_b)
 
         if best_move is not None:
             _, a, b, pa, pb, ca, cb = best_move
@@ -381,24 +394,34 @@ def _vnd_intensification(groups, leftover, X, K, k_t, delta_bar, w, lambda_penal
             )
             continue
 
-        # N2: best leftover swap
+        # N2: best leftover swap (sampled pack-cell-leftover combos)
         if len(leftover) > 0:
             best_dE2 = 0.0
             best_move2 = None
 
-            for a in range(len(groups)):
+            # Generate all (group_idx, cell_pos, leftover_idx) combos, then sample
+            all_combos = []
+            for a in range(n_groups):
                 for pa in range(len(groups[a])):
                     for lc in range(len(leftover)):
-                        nr, feas = _leftover_swap_reward(
-                            stats_list[a], groups[a][pa], leftover[lc], X, X_sq_norms, w_dot_X,
-                            lambda_penalty, delta_bar, theta1, theta2, theta3, P1, P2, P3,
-                        )
-                        if not feas:
-                            continue
-                        dE = nr - infos[a]["reward"]
-                        if dE > best_dE2 + 1e-12:
-                            best_dE2 = dE
-                            best_move2 = ('leftover', a, pa, lc, groups[a][pa], leftover[lc])
+                        all_combos.append((a, pa, lc))
+            n_combos = len(all_combos)
+            sampled_combos = all_combos
+            if n_combos > sample_limit_n2:
+                indices = rng.choice(n_combos, size=sample_limit_n2, replace=False)
+                sampled_combos = [all_combos[i] for i in indices]
+
+            for a, pa, lc in sampled_combos:
+                nr, feas = _leftover_swap_reward(
+                    stats_list[a], groups[a][pa], leftover[lc], X, X_sq_norms, w_dot_X,
+                    lambda_penalty, delta_bar, theta1, theta2, theta3, P1, P2, P3,
+                )
+                if not feas:
+                    continue
+                dE = nr - infos[a]["reward"]
+                if dE > best_dE2 + 1e-12:
+                    best_dE2 = dE
+                    best_move2 = ('leftover', a, pa, lc, groups[a][pa], leftover[lc])
 
             if best_move2 is not None:
                 _, a, pa, lc, out_c, in_c = best_move2
@@ -704,7 +727,7 @@ def solve_rrp_sa(
         if (sa_iter + 1) % vnd_interval == 0 and len(current_groups) > 0:
             current_groups, current_leftover = _vnd_intensification(
                 current_groups, current_leftover, X, K, k_t, delta_bar, w_arr, lambda_penalty,
-                theta1, theta2, theta3, P1, P2, P3, X_sq_norms, w_dot_X, max_vnd_rounds,
+                theta1, theta2, theta3, P1, P2, P3, X_sq_norms, w_dot_X, max_vnd_rounds, rng=rng,
             )
             current_reward, current_infos = _recompute_all_rewards(
                 X, current_groups, K, delta_bar, w_arr, lambda_penalty,

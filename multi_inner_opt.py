@@ -31,9 +31,9 @@ METHODS = [
     # "RRP_GRASP",
     "RRP_GA",
     "RRP_SA",
-    # "RRP_COLUMN_GENERATION",
-    # "RRP_GUROBI_MIP",
-    # "RRP_GUROBI_ENUM",  # skipped: C(n,K) too large for N>=50, K=8
+     # "RRP_COLUMN_GENERATION",
+     # "RRP_GUROBI_MIP",
+     # "RRP_GUROBI_ENUM",  # skipped: C(n,K) too large for N>=50, K=8
 ]
 
 METHOD_LABELS = {
@@ -180,6 +180,8 @@ def solve_one_method(method: str, X: np.ndarray, cfg: Config, seed: int) -> dict
             cell_candidate_limit=cfg.vns.cell_candidate_limit,
             leftover_candidate_limit=cfg.vns.leftover_candidate_limit,
             destroy_size=cfg.vns.destroy_size,
+            enable_n5=False,
+            n_starts=cfg.vns.n_starts,
         )
 
     elif method == "RRP_MS_KMEANS_VNS":
@@ -878,7 +880,7 @@ def run_one_experiment_with_seed(seed: int, n_rounds: int = 10, arrivals_per_rou
     from datetime import datetime
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = f"rrp_multi_round_seed{seed}_{timestamp}.xlsx"
+    output_path = f"rrp_multi_round_{timestamp}_seed{seed}.xlsx"
 
     print(f"\n{'='*60}")
     print(f"Starting experiment with base_seed={seed}")
@@ -900,15 +902,15 @@ def main():
     create_excel_template_only("rrp_multi_round_template.xlsx", n_rounds=20)
 
     # 2) 用 10 个不同的随机种子跑实验，每次结果保存到不同的 Excel
-    n_runs = 10
+    n_runs = 20
     all_results = []
 
     for i in range(n_runs):
         seed = 42 + i * 7  # 每次使用不同的种子值
         detail_df, summary_df, output_path = run_one_experiment_with_seed(
             seed=seed,
-            n_rounds=10,
-            arrivals_per_round=500,
+            n_rounds=20,
+            arrivals_per_round=1000,
         )
         all_results.append((seed, output_path, summary_df))
 

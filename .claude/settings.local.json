@@ -32,7 +32,17 @@
       "Bash(conda run *)",
       "Bash(tasklist)",
       "Bash(cat)",
-      "Bash(echo \"Started with PID $!\")"
+      "Bash(echo \"Started with PID $!\")",
+      "Bash(.venv\\\\Scripts\\\\activate)",
+      "Bash(.venv/Scripts/python.exe -c \"import scipy; print\\('scipy', scipy.__version__\\); import openpyxl; print\\('openpyxl', openpyxl.__version__\\); import matplotlib; print\\('matplotlib', matplotlib.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip install scipy openpyxl matplotlib)",
+      "Bash(.venv/Scripts/python.exe experiment_inner_rrp.py --quick)",
+      "Bash(.venv/Scripts/python.exe -m pip install pandas tqdm)",
+      "Bash(.venv/Scripts/python.exe -c \"from scipy import stats; import numpy as np; vals = np.random.randn\\(20\\); labels = ['A']*10 + ['B']*10; r = stats.tukey_hsd\\(vals, groups=labels\\); print\\(type\\(r\\)\\); print\\(r.summary\\(\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"from scipy import stats; import numpy as np; help\\(stats.tukey_hsd\\)\")",
+      "Bash(.venv/Scripts/python.exe experiment_two_stage.py --quick)",
+      "Bash(.venv/Scripts/python.exe -c \"import main_two_stage; print\\('Import OK'\\); print\\('METHODS:', main_two_stage.METHODS\\)\")",
+      "Bash(.venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

@@ -12,8 +12,34 @@ from heuristics.rrp_kmeans import solve_rrp_kmeans
 from heuristics.rrp_kmeans_vns import solve_rrp_kmeans_vns
 from heuristics.rrp_grasp import solve_rrp_grasp
 from heuristics.rrp_ga import solve_rrp_ga
+from heuristics.rrp_sa import solve_rrp_sa
+from heuristics.rrp_ms_kmeans_vns import solve_rrp_ms_kmeans_vns
 from outer.tsrah import tsrah_scrapping_decision, default_quality_score
 from outer.arrival import gaussian_arrival_generator
+
+
+# =========================================================
+# 可在此处灵活控制参与实验的启发式算法种类
+# 注释/取消注释即可开关对应算法
+# =========================================================
+
+METHODS = [
+    "KMEANS",
+    "VNS",
+    # "GRASP",
+    # "GA",
+    # "SA",
+    # "MS_VNS",
+]
+
+METHOD_LABELS = {
+    "KMEANS": "KMeans",
+    "VNS": "KMeans_VNS",
+    "GRASP": "GRASP",
+    "GA": "GA",
+    "SA": "SA",
+    "MS_VNS": "MS_KMeans_VNS",
+}
 
 
 # =========================================================
@@ -104,31 +130,81 @@ def solve_inner_rrp(
             leftover_candidate_limit=cfg.ga.leftover_candidate_limit,
         )
 
-    # default: VNS
-    return solve_rrp_kmeans_vns(
-        X=X,
-        K=cfg.problem.K,
-        k_t=k_t,
-        delta_bar=cfg.problem.delta_bar,
-        L1=cfg.vns.L1,
-        tol=cfg.vns.tol,
-        max_vns_iter=cfg.vns.max_vns_iter,
-        max_no_improve=cfg.vns.max_no_improve,
-        w=cfg.problem.w,
-        lambda_penalty=cfg.problem.lambda_penalty,
-        theta1=cfg.problem.theta1,
-        theta2=cfg.problem.theta2,
-        theta3=cfg.problem.theta3,
-        P1=cfg.problem.P1,
-        P2=cfg.problem.P2,
-        P3=cfg.problem.P3,
-        seed=seed,
-        pack_candidate_limit=cfg.vns.pack_candidate_limit,
-        partner_limit=cfg.vns.partner_limit,
-        cell_candidate_limit=cfg.vns.cell_candidate_limit,
-        leftover_candidate_limit=cfg.vns.leftover_candidate_limit,
-        destroy_size=cfg.vns.destroy_size,
-    )
+    if method == "VNS":
+        return solve_rrp_kmeans_vns(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            L1=cfg.vns.L1,
+            tol=cfg.vns.tol,
+            max_vns_iter=cfg.vns.max_vns_iter,
+            max_no_improve=cfg.vns.max_no_improve,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
+            pack_candidate_limit=cfg.vns.pack_candidate_limit,
+            partner_limit=cfg.vns.partner_limit,
+            cell_candidate_limit=cfg.vns.cell_candidate_limit,
+            leftover_candidate_limit=cfg.vns.leftover_candidate_limit,
+            destroy_size=cfg.vns.destroy_size,
+        )
+
+    if method == "SA":
+        return solve_rrp_sa(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
+            initial_temperature=cfg.sa.initial_temperature,
+            cooling_rate=cfg.sa.cooling_rate,
+            min_temperature=cfg.sa.min_temperature,
+            max_sa_iterations=cfg.sa.max_sa_iterations,
+            vnd_interval=cfg.sa.vnd_interval,
+            max_vnd_rounds=cfg.sa.max_vnd_rounds,
+            reheating_ratio=cfg.sa.reheating_ratio,
+            reheating_stall=cfg.sa.reheating_stall,
+            max_reheats=cfg.sa.max_reheats,
+            tabu_tenure=cfg.sa.tabu_tenure,
+            n_init_starts=cfg.sa.n_init_starts,
+            kmeans_L1=cfg.sa.kmeans_L1,
+            kmeans_tol=cfg.sa.kmeans_tol,
+            residual_rounds=cfg.sa.residual_rounds,
+        )
+
+    if method == "MS_VNS":
+        return solve_rrp_ms_kmeans_vns(
+            X=X,
+            K=cfg.problem.K,
+            k_t=k_t,
+            delta_bar=cfg.problem.delta_bar,
+            w=cfg.problem.w,
+            lambda_penalty=cfg.problem.lambda_penalty,
+            theta1=cfg.problem.theta1,
+            theta2=cfg.problem.theta2,
+            theta3=cfg.problem.theta3,
+            P1=cfg.problem.P1,
+            P2=cfg.problem.P2,
+            P3=cfg.problem.P3,
+            seed=seed,
+        )
+
+    raise ValueError(f"Unknown method: {method}")
 
 
 # =========================================================
@@ -710,6 +786,42 @@ def plot_method_comparison(summary_df: pd.DataFrame):
     plt.show()
 
 
+def run_one_experiment_with_seed(
+    seed: int,
+    n_periods: int = 20,
+    H_scrap: int = 5,
+    methods: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    使用指定种子跑一次两阶段仿真实验。
+    methods 默认为顶部 METHODS 列表中启用的算法。
+    """
+    cfg = Config()
+    E_thresholds = [70, 80, 90, 100, 110, 115, 120, 125, 130, 135, 140]
+    m_list = [2, 4, 8]
+    rho = 0.5
+    gamma = 0.95
+    s0 = 5.0
+
+    if methods is None:
+        methods = list(METHODS)
+
+    summary_df, all_online, all_ub = compare_inner_methods(
+        cfg=cfg,
+        methods=methods,
+        n_periods=n_periods,
+        H_scrap=H_scrap,
+        E_thresholds=E_thresholds,
+        m_list=m_list,
+        rho=rho,
+        gamma=gamma,
+        s0=s0,
+        seed=seed,
+    )
+
+    return summary_df
+
+
 def main():
     cfg = Config()
 
@@ -722,7 +834,8 @@ def main():
     s0 = 5.0
     seed = 43
 
-    methods = ["KMEANS", "VNS", "GRASP", "GA"]
+    # 参与实验的算法列表，修改顶部 METHODS 即可控制
+    methods = list(METHODS)
 
     summary_df, all_online, all_ub = compare_inner_methods(
         cfg=cfg,
@@ -743,14 +856,15 @@ def main():
 
     plot_method_comparison(summary_df)
 
-    # 你若想单独看某一个方法的详细结果，比如 KMEANS：
-    print("\n=== Detailed Online Results: KMEANS ===")
-    with pd.option_context("display.max_columns", None, "display.width", 260):
-        print(all_online["KMEANS"].to_string(index=False))
+    # 打印所有已运行方法的详细结果
+    for method in methods:
+        print(f"\n=== Detailed Online Results: {method} ===")
+        with pd.option_context("display.max_columns", None, "display.width", 260):
+            print(all_online[method].to_string(index=False))
 
-    print("\n=== Detailed UB Results: KMEANS ===")
-    with pd.option_context("display.max_columns", None, "display.width", 260):
-        print(all_ub["KMEANS"].to_string(index=False))
+        print(f"\n=== Detailed UB Results: {method} ===")
+        with pd.option_context("display.max_columns", None, "display.width", 260):
+            print(all_ub[method].to_string(index=False))
 
 
 if __name__ == "__main__":

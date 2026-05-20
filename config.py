@@ -20,7 +20,7 @@ class ExperimentConfig:
 class ProblemConfig:
     n_cells: int = 500
     K: int = 8
-    k_max: int = 80
+    k_max: int = 150
     delta_bar: float = 0.8
     w: Tuple[float, float] = (0.5, 0.5)
     lambda_penalty: float = 0.05
@@ -46,15 +46,16 @@ class KMeansConfig:
 
 @dataclass
 class VNSConfig:
-    L1: int = 10
+    L1: int = 15
     tol: float = 1e-4
-    max_vns_iter: int = 100
-    max_no_improve: int = 20
-    pack_candidate_limit: int = 6
+    max_vns_iter: int = 80
+    max_no_improve: int = 15
+    pack_candidate_limit: int = 8
     partner_limit: int = 6
-    cell_candidate_limit: int = 2
-    leftover_candidate_limit: int = 10
-    destroy_size: int = 2
+    cell_candidate_limit: int = 3
+    leftover_candidate_limit: int = 12
+    destroy_size: int = 3
+    n_starts: int = 3
 
 @dataclass
 class GRASPConfig:
@@ -94,14 +95,14 @@ class SAConfig:
     initial_temperature: float | None = None
     cooling_rate: float = 0.995
     min_temperature: float = 1e-4
-    max_sa_iterations: int = 5000
-    vnd_interval: int = 200
-    max_vnd_rounds: int = 5
+    max_sa_iterations: int = 2000
+    vnd_interval: int = 150
+    max_vnd_rounds: int = 3
     reheating_ratio: float = 3.0
-    reheating_stall: int = 500
+    reheating_stall: int = 300
     max_reheats: int = 3
-    tabu_tenure: int = 25
-    n_init_starts: int = 5
+    tabu_tenure: int = 15
+    n_init_starts: int = 3
     kmeans_L1: int = 15
     kmeans_tol: float = 1e-4
     residual_rounds: int = 20

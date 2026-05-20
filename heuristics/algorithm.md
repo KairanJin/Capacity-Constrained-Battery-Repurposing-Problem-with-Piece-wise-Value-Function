@@ -75,18 +75,19 @@ Stage 2 结束后，部分组可能不满 K 个电芯。重组策略：
 
 **基本思想：** 在 K-Means 初始解的基础上，系统地探索多种邻域结构进行局部搜索，且**仅针对 P2/P3 级别的 pack 进行优化，P1 组全程不参与搜索**（避免打乱已达最高质量等级的 pack）。
 
-- **初始解：** 与 RRP_KMEANS 相同的 K-Means 聚类过程。
-- **P1 组锁定机制：** 候选组筛选（`_select_candidate_group_ids`）和合作组筛选（`_nearest_partner_group_ids`）均排除 `phi >= theta1` 的 P1 组。所有五类邻域操作的操作对象仅限于 P2/P3 级别的 pack。
+- **多起点机制（`n_starts`）：** 默认运行 3 次独立的 VNS 搜索（每次使用不同的 K-Means 随机种子），取总收益最高的解作为最终输出，克服单一起点容易陷入局部最优的问题。
+- **初始解：** 与 RRP_KMEANS 相同的 K-Means 聚类过程（L1=15, tol=1e-4）。
+- **P1 组锁定机制：** 候选组筛选（`_select_candidate_group_ids`）和合作组筛选（`_nearest_partner_group_ids`）均排除 `phi >= theta1` 的 P1 组。所有邻域操作的操作对象仅限于 P2/P3 级别的 pack。
 - **优先级排序：** 在 P2/P3 组中，根据 pack 的收益和距下一价格阈值的距离，对 pack 进行优先级评分，优先搜索"最值得调整"的 pack。
 - **五类邻域操作（N1-N5）：**
   - **N1（1-1 交换）：** 在两个 P2/P3 pack 之间交换单个电芯，采用 first-improvement 策略（找到第一个改进即接受）。优先选择离群电芯（距质心远的电芯）进行交换。
   - **N2（leftover 交换）：** 用 leftover 中的电芯替换 P2/P3 pack 中的离群电芯，优先选择靠近质心且质量贡献高的 leftover 电芯。
   - **N3（2-2 交换）：** 在两个 P2/P3 pack 之间同时交换两个电芯，探索更大的邻域空间。
   - **N4（破坏-修复）：** 选择收益最低的若干个 P2/P3 pack 拆解，将电芯放回候选池，然后以贪婪方式重新构建新 pack。
-  - **N5（合并-分裂，默认关闭）：** 将两个 P2/P3 pack 合并后重新枚举所有可能的均衡划分（当 K 较小时可行，K=8 时计算量过大）。
+  - **N5（合并-分裂，默认关闭）：** 将两个 P2/P3 pack 合并后重新枚举所有可能的均衡划分。采用 first-improvement 策略（找到第一个改进即返回），且仅搜索最差的前 3 个 pack 和最近 2 个 partner，以控制 K=8 时 C(16,8)=12870 的计算量。
 - **两阶段搜索：** Phase A 反复执行 N1/N2/N3 直至无法改进；Phase B 在停滞时触发 N4 大邻域搜索；Phase C 可选触发 N5。
 
-**核心优势：** 多邻域结构避免了单一邻域容易陷入的局部最优，P1 锁定机制避免了对已达最高质量等级 pack 的无效扰动，聚焦搜索资源于有提升空间的 P2/P3 组。
+**核心优势：** 多起点策略克服了单一 K-Means 初始解质量不稳定的问题，多邻域结构避免了单一邻域容易陷入的局部最优，P1 锁定机制避免了对已达最高质量等级 pack 的无效扰动，聚焦搜索资源于有提升空间的 P2/P3 组。
 
 ---
 
@@ -172,7 +173,7 @@ GA 主循环结束后，对最优个体执行 `residual_pack_repair`，从 lefto
 
 ### 4.2 多起点初始化
 
-1. **K-Means 起点：** 用 `n_init_starts` 个不同随机种子运行 `_kmeans_solution`（L1=15, tol=1e-4），每次随机选择 `max(k_t, (n+K-1)//K)` 个初始中心，执行带容量约束的最近邻分配，最多 L1 轮迭代。
+1. **K-Means 起点：** 用 `n_init_starts=3` 个不同随机种子运行 `_kmeans_solution`（L1=15, tol=1e-4），每次随机选择 `max(k_t, (n+K-1)//K)` 个初始中心，执行带容量约束的最近邻分配，最多 L1 轮迭代。
 2. **贪婪起点：** 运行 `_greedy_solution`，每轮选择质量最高（`X @ w` 最大）的电芯作为种子，在候选中选择 `-distance + 0.05 * quality` 评分最高的 K-1 个电芯组成 pack。
 3. **可行性过滤 + 择优：** 对所有候选解过滤掉 `delta > delta_bar` 的 pack，选择总收益最高者作为 SA 初始解。
 
@@ -212,32 +213,34 @@ new_phi_a = (stats_a.w_dot_sum - w·X[cell_a] + w·X[cell_b]) / K
 
 - **改进移动（dE >= 0）：** 直接接受。
 - **劣化移动（dE < 0）：** 以概率 `exp(dE / T)` 接受（`T > 1e-10` 时）。
-- **Tabu 记录：** 仅 1-1 swap 接受后将电芯对加入 tabu 列表，有效期 `tabu_tenure=25` 次迭代。
+- **Tabu 记录：** 仅 1-1 swap 接受后将电芯对加入 tabu 列表，有效期 `tabu_tenure=15` 次迭代。
 
-### 4.7 周期性 VND 强化
+### 4.7 周期性 VND 强化（采样模式）
 
-每隔 `vnd_interval=200` 次迭代，执行系统的最佳改进局部搜索（`_vnd_intensification`）：
+每隔 `vnd_interval=150` 次迭代，执行系统的最佳改进局部搜索（`_vnd_intensification`）。为降低计算量，VND 采用**采样模式**而非穷举：
 
-1. **N1 穷举 1-1 交换：** 遍历所有 pack 对 (a, b) 的所有电芯对，使用增量公式计算 `dE`，记录最大正增益移动（`dE > 1e-12`），应用后重新进入 N1。
-2. **N2 穷举 leftover 交换：** 若 N1 无改进，遍历所有 pack 电芯与所有 leftover 电芯的组合，记录最大正增益移动，应用后重新进入 N1。
-3. **终止：** 若 N1 和 N2 均无改进，退出 VND。最多执行 `max_vnd_rounds=5` 轮。
+1. **N1 采样 1-1 交换：** 从所有 pack 对中随机采样 `sample_limit_n1=50` 个 pack 对，在每个采样对内穷举所有电芯对，使用增量公式计算 `dE`，记录最大正增益移动（`dE > 1e-12`），应用后重新进入 N1。
+2. **N2 采样 leftover 交换：** 若 N1 无改进，从所有 (pack, cell, leftover) 组合中随机采样 `sample_limit_n2=200` 个组合，记录最大正增益移动，应用后重新进入 N1。
+3. **终止：** 若 N1 和 N2 均无改进，退出 VND。最多执行 `max_vnd_rounds=3` 轮。
+
+采样模式将 VND 的计算量从穷举的 O(|G|²·K²) 降至 O(sample_limit_n1·K²)，性能提升约 30 倍（单轮 runtime 从 ~50s 降至 ~1.7s）。
 
 ### 4.8 再加热机制（Reheating）
 
-当连续 `reheating_stall=500` 次迭代未改进最优解时：
+当连续 `reheating_stall=300` 次迭代未改进最优解时：
 - 将温度提升为 `T = T0 * reheating_ratio`（默认 `T0 * 3.0`）
 - 重置 `stall_count = 0`
 - 最多执行 `max_reheats=3` 次
 
 ### 4.9 几何冷却
 
-每轮迭代末尾执行 `T *= cooling_rate`（默认 0.995），下限 `min_temperature=1e-4`。
+每轮迭代末尾执行 `T *= cooling_rate`（默认 0.995），下限 `min_temperature=1e-4`。最大迭代次数 `max_sa_iterations=2000`。
 
 ### 4.10 后处理：残余打包
 
 SA 主循环结束后，对最优解执行 `residual_pack_repair`（`max_rounds=20, seed_candidate_limit=12, neighbor_candidate_limit=20`），从 leftover 中提取额外收益。
 
-**核心优势：** 概率接受机制能有效跳出局部最优，自适应温度和再加热使算法在不同阶段保持合适的探索强度，GroupStats 增量评估使 swap 操作高效（O(d)），VND 周期性强化保证局部搜索精度。
+**核心优势：** 概率接受机制能有效跳出局部最优，自适应温度和再加热使算法在不同阶段保持合适的探索强度，GroupStats 增量评估使 swap 操作高效（O(d)），VND 采样模式在保持搜索精度的同时将计算量降低约 30 倍。
 
 ---
 
@@ -348,9 +351,9 @@ SA 主循环结束后，对最优解执行 `residual_pack_repair`（`max_rounds=
 | 算法 | 类型 | 搜索策略 | 优势 | 适用场景 |
 |------|------|----------|------|----------|
 | RRP_KMEANS | 聚类 | 几何聚类 + 局部交换 | 速度最快 | 快速基线 |
-| RRP_KMEANS_VNS | 元启发式 | 多邻域变邻域搜索 | 局部搜索能力强 | 中等规模 |
+| RRP_KMEANS_VNS | 元启发式 | 多起点 + 多邻域搜索 | 局部搜索能力强 + 多起点多样性 | 中等规模 |
 | RRP_GA | 进化算法 | 种群交叉变异 | 全局搜索能力强 | 大规模 |
-| RRP_SA | 元启发式 | 概率接受 + 退火 | 跳出局部最优能力强 | 复杂地形 |
+| RRP_SA | 元启发式 | 概率接受 + 退火 + VND采样 | 跳出局部最优能力强 + 高效VND | 复杂地形 |
 | RRP_GRASP | 构造+改进 | 贪婪随机 + 局部搜索 | 构造质量好 | 多起点并行 |
 | RRP_COLUMN_GENERATION | 精确/启发式 | 列生成 + 线性规划 | 理论保证 | 高质量要求 |
 | RRP_COMBINE_REPAIR | 组合优化 | pack 池重组 | 组合现有优质解 | 快速改进 |
