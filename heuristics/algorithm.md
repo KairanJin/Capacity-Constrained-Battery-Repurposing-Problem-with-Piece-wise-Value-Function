@@ -170,12 +170,69 @@ GA 主循环结束后，对最优个体执行 `residual_pack_repair`，从 lefto
 - **解表示：** 当前解由 `groups`（可行 pack 列表）+ `leftover`（未分配电芯）+ `current_reward`（总收益）表示。
 - **GroupStats 增量统计：** 每个 pack 维护一个 `GroupStats` 对象，记录 `sum_vec`（电芯特征和）、`sum_sq`（电芯范数平方和）、`w_dot_sum`（权重方向投影和），使 swap 操作的 delta/phi 计算复杂度从 O(K·d) 降为 O(d)。
 - **Tabu 列表：** 使用 `tabu_set` + `tabu_list`（FIFO 队列）管理禁忌对，禁忌键为 `(min(cell_a, cell_b), max(cell_a, cell_b))`，有效期 `tabu_tenure` 次迭代。
+- **预计算数组：** `X_sq_norms`（每个电芯的 ||X[i]||²）和 `w_dot_X`（每个电芯的 w·X[i]），在算法开始时一次性计算，O(1) 查表。
+
+```python
+# heuristics/_grasp_stats.py - GroupStats 类
+class GroupStats:
+    """Incremental tracker for group centroid, delta, and phi. O(d) updates."""
+    __slots__ = ('sum_vec', 'sum_sq', 'w_dot_sum', 'count')
+
+    def add(self, cell_idx, X, X_sq_norms, w_dot_X):
+        if self.count == 0:
+            self.sum_vec = X[cell_idx].copy()
+        else:
+            self.sum_vec += X[cell_idx]
+        self.sum_sq += X_sq_norms[cell_idx]
+        self.w_dot_sum += w_dot_X[cell_idx]
+        self.count += 1
+
+    @property
+    def delta(self):
+        n = self.count
+        return self.sum_sq / n - (self.sum_vec @ self.sum_vec) / (n * n)
+
+    @property
+    def phi(self):
+        return self.w_dot_sum / self.count
+```
 
 ### 4.2 多起点初始化
 
 1. **K-Means 起点：** 用 `n_init_starts=3` 个不同随机种子运行 `_kmeans_solution`（L1=15, tol=1e-4），每次随机选择 `max(k_t, (n+K-1)//K)` 个初始中心，执行带容量约束的最近邻分配，最多 L1 轮迭代。
 2. **贪婪起点：** 运行 `_greedy_solution`，每轮选择质量最高（`X @ w` 最大）的电芯作为种子，在候选中选择 `-distance + 0.05 * quality` 评分最高的 K-1 个电芯组成 pack。
 3. **可行性过滤 + 择优：** 对所有候选解过滤掉 `delta > delta_bar` 的 pack，选择总收益最高者作为 SA 初始解。
+
+```python
+# rrp_sa.py - 多起点初始化
+candidates = []
+# K-means starts (n_init_starts=3)
+km_seeds = rng.integers(0, 2**31, size=n_init_starts).tolist()
+for s in km_seeds:
+    groups, leftover = _kmeans_solution(X, K, k_t, kmeans_L1, kmeans_tol, seed=int(s))
+    feasible = []
+    used = set()
+    for g in groups:
+        if len(feasible) >= k_t:
+            used.update(g); continue
+        r, feas = _evaluate_group_simple(X, g, K, delta_bar, ...)
+        if feas: feasible.append(sorted(g)); used.update(g)
+        else: used.update(g)
+    candidates.append((feasible, sorted(set(range(n)) - used)))
+
+# Greedy start
+groups, leftover = _greedy_solution(X, K, k_t, w_arr, rng)
+# ... 可行性过滤后加入 candidates
+
+# Pick best initial solution
+best_groups, best_leftover, best_reward = [], list(range(n)), -np.inf
+for groups, leftover in candidates:
+    total, _ = _recompute_all_rewards(...)
+    if total > best_reward:
+        best_reward = total
+        best_groups = [g[:] for g in groups]
+        best_leftover = leftover[:]
+```
 
 ### 4.3 自适应温度估计（`_estimate_initial_temperature`）
 
@@ -186,16 +243,46 @@ GA 主循环结束后，对最优个体执行 `residual_pack_repair`，从 lefto
 3. **温度计算：** `T0 = mean(|dE|) / ln(2)`，使得 `exp(-mean_de / T0) ≈ 0.5`，即平均接受概率约 50%。
 4. **兜底：** 若无劣化移动，返回 `T0 = 1.0`。
 
+```python
+# rrp_sa.py - 自适应温度估计
+def _estimate_initial_temperature(..., rng, n_samples=50):
+    worsening = []
+    for _ in range(n_samples):
+        # 随机选两个pack各一个电芯
+        a, b = random two different groups
+        cell_a, cell_b = random cell from each group
+        nr_a, nr_b, fa, fb = _swap_rewards(...)  # O(d) 增量计算
+        if fa and fb:
+            dE = (nr_a + nr_b) - (infos[a]["reward"] + infos[b]["reward"])
+            if dE < 0:
+                worsening.append(abs(dE))
+    # T0 = mean(|dE|) / ln(2) → exp(-mean/T0) = 0.5
+    return mean_de / np.log(2) if mean_de > 1e-10 else 1.0
+```
+
 ### 4.4 增量评估（O(d) 复杂度）
 
+这是 SA 算法性能优化的核心。传统方法每次 swap 需要 O(K·d) 重新计算 delta 和 phi，而 SA 使用 `GroupStats` 将复杂度降为 O(d)。
+
 **Swap 增量计算（`_swap_rewards`）：** 对两个 pack a 和 b 交换电芯 `cell_a <-> cell_b`：
+```python
+# rrp_sa.py - swap 增量计算（O(d)）
+def _swap_rewards(stats_a, stats_b, cell_a, cell_b, ...):
+    n = stats_a.count  # = K
+
+    # Group a: remove cell_a, add cell_b
+    new_sum_sq_a = stats_a.sum_sq - X_sq_norms[cell_a] + X_sq_norms[cell_b]
+    new_sum_vec_a = stats_a.sum_vec - X[cell_a] + X[cell_b]
+    new_delta_a = new_sum_sq_a / n - (new_sum_vec_a @ new_sum_vec_a) / (n * n)
+    if new_delta_a > delta_bar:
+        return -np.inf, -np.inf, False, False  # 不可行
+    new_phi_a = (stats_a.w_dot_sum - w_dot_X[cell_a] + w_dot_X[cell_b]) / n
+    new_reward_a = piecewise_value(new_phi_a, ...) - lambda_penalty * new_delta_a
+
+    # Group b: remove cell_b, add cell_a（同理）
+    # ...
+    return new_reward_a, new_reward_b, True, True
 ```
-new_sum_sq_a = stats_a.sum_sq - ||X[cell_a]||^2 + ||X[cell_b]||^2
-new_sum_vec_a = stats_a.sum_vec - X[cell_a] + X[cell_b]
-new_delta_a = new_sum_sq_a / K - ||new_sum_vec_a||^2 / K^2
-new_phi_a = (stats_a.w_dot_sum - w·X[cell_a] + w·X[cell_b]) / K
-```
-若 `new_delta_a > delta_bar` 则判定不可行，否则计算 `reward = piecewise_value(phi) - lambda * delta`。
 
 **Leftover 增量计算（`_leftover_swap_reward`）：** 同理，仅更新单个 pack 的统计量。
 
@@ -207,13 +294,43 @@ new_phi_a = (stats_a.w_dot_sum - w·X[cell_a] + w·X[cell_b]) / K
 2. **Leftover 交换（30% 概率）：** 随机选一个 pack 的一个电芯和一个 leftover 电芯，检查可行性。最多尝试 20 次。
 3. **2-2 交换（20% 概率）：** 随机选两个不同 pack 各两个电芯，互相交换，完整评估（非增量）。最多尝试 15 次。
 
-若所有尝试均未找到可行移动，跳过该轮迭代。
+```python
+# rrp_sa.py - 邻域选择
+r = rng.random()
+if r < 0.5 and len(current_groups) >= 2:
+    # 1-1 swap (50%)
+    candidate = _generate_swap_candidate(...)
+    move_type = 'swap'
+elif r < 0.8 and len(current_leftover) > 0:
+    # Leftover swap (30%)
+    candidate = _generate_leftover_candidate(...)
+    move_type = 'leftover'
+else:
+    # 2-2 exchange (20%)
+    candidate = _generate_2exchange_candidate(...)
+    move_type = '2exchange'
+```
 
 ### 4.6 SA 接受准则
 
 - **改进移动（dE >= 0）：** 直接接受。
 - **劣化移动（dE < 0）：** 以概率 `exp(dE / T)` 接受（`T > 1e-10` 时）。
 - **Tabu 记录：** 仅 1-1 swap 接受后将电芯对加入 tabu 列表，有效期 `tabu_tenure=15` 次迭代。
+
+```python
+# rrp_sa.py - SA 接受准则
+accept = dE >= 0 or (T > 1e-10 and rng.random() < np.exp(dE / T))
+
+if accept:
+    # 应用移动
+    if move_type == 'swap':
+        _apply_swap(current_groups, current_stats, ...)
+        # 加入 tabu 列表
+        tabu_key = (min(ca, cb), max(ca, cb))
+        tabu_set.add(tabu_key)
+        tabu_list.append((tabu_key, sa_iter + tabu_tenure))
+    # ... 更新 current_reward, current_infos, current_stats
+```
 
 ### 4.7 周期性 VND 强化（采样模式）
 
@@ -222,6 +339,38 @@ new_phi_a = (stats_a.w_dot_sum - w·X[cell_a] + w·X[cell_b]) / K
 1. **N1 采样 1-1 交换：** 从所有 pack 对中随机采样 `sample_limit_n1=50` 个 pack 对，在每个采样对内穷举所有电芯对，使用增量公式计算 `dE`，记录最大正增益移动（`dE > 1e-12`），应用后重新进入 N1。
 2. **N2 采样 leftover 交换：** 若 N1 无改进，从所有 (pack, cell, leftover) 组合中随机采样 `sample_limit_n2=200` 个组合，记录最大正增益移动，应用后重新进入 N1。
 3. **终止：** 若 N1 和 N2 均无改进，退出 VND。最多执行 `max_vnd_rounds=3` 轮。
+
+```python
+# rrp_sa.py - VND 采样模式
+def _vnd_intensification(..., max_vnd_rounds=3, sample_limit_n1=50, sample_limit_n2=200, rng=None):
+    for _ in range(max_vnd_rounds):
+        # N1: 采样 pack 对
+        all_pairs = [(a, b) for a in range(n_groups) for b in range(a + 1, n_groups)]
+        if len(all_pairs) > sample_limit_n1:
+            indices = rng.choice(len(all_pairs), size=sample_limit_n1, replace=False)
+            sampled_pairs = [all_pairs[i] for i in indices]
+        else:
+            sampled_pairs = all_pairs
+
+        # 在采样范围内找 best-improvement
+        for a, b in sampled_pairs:
+            for pa in range(len(groups[a])):
+                for pb in range(len(groups[b])):
+                    # O(d) 增量计算
+                    nr_a, nr_b, fa, fb = _swap_rewards(...)
+                    if fa and fb:
+                        dE = (nr_a + nr_b) - (infos[a]["reward"] + infos[b]["reward"])
+                        if dE > best_dE + 1e-12:
+                            best_dE = dE
+                            best_move = ('swap', a, b, pa, pb, cell_a, cell_b)
+
+        if best_move:
+            _apply_swap(...); continue  # 重新进入 N1
+
+        # N2: 采样 leftover 组合（同理）
+        # ...
+        break  # 无改进则退出
+```
 
 采样模式将 VND 的计算量从穷举的 O(|G|²·K²) 降至 O(sample_limit_n1·K²)，性能提升约 30 倍（单轮 runtime 从 ~50s 降至 ~1.7s）。
 
@@ -232,13 +381,65 @@ new_phi_a = (stats_a.w_dot_sum - w·X[cell_a] + w·X[cell_b]) / K
 - 重置 `stall_count = 0`
 - 最多执行 `max_reheats=3` 次
 
+```python
+# rrp_sa.py - 再加热
+if stall_count >= reheating_stall and reheat_count < max_reheats:
+    T = T0 * reheating_ratio  # 温度重置为初始值的3倍
+    reheat_count += 1
+    stall_count = 0
+```
+
 ### 4.9 几何冷却
 
 每轮迭代末尾执行 `T *= cooling_rate`（默认 0.995），下限 `min_temperature=1e-4`。最大迭代次数 `max_sa_iterations=2000`。
 
-### 4.10 后处理：残余打包
+### 4.10 Tabu 列表管理
+
+```python
+# rrp_sa.py - Tabu 管理
+# 清理过期条目
+while tabu_list and tabu_list[0][1] <= sa_iter:
+    expired_key = tabu_list.pop(0)[0]
+    tabu_set.discard(expired_key)
+
+# 添加新条目（仅 1-1 swap）
+tabu_key = (min(ca, cb), max(ca, cb))
+tabu_set.add(tabu_key)
+tabu_list.append((tabu_key, sa_iter + tabu_tenure))  # 有效期 = 当前迭代 + 15
+```
+
+Tabu 列表防止算法在最近的移动中来回循环，`tabu_tenure=15` 确保被禁止的电芯对在一定轮数后重新可用。
+
+### 4.11 后处理：残余打包
 
 SA 主循环结束后，对最优解执行 `residual_pack_repair`（`max_rounds=20, seed_candidate_limit=12, neighbor_candidate_limit=20`），从 leftover 中提取额外收益。
+
+### 算法流程图
+
+```
+多起点初始化 (K-Means × 3 + Greedy × 1)
+         ↓
+    选择最佳初始解
+         ↓
+    自适应温度估计 T0
+         ↓
+    ┌─────────────────┐
+    │ SA 主循环 (2000轮) │
+    │ 1. 清理过期Tabu    │
+    │ 2. 随机选择邻域    │
+    │    (50/30/20%)    │
+    │ 3. SA接受准则      │
+    │    exp(dE/T)      │
+    │ 4. 更新最优解      │
+    │ 5. 再加热检查      │
+    │ 6. 每150轮VND     │
+    │ 7. 几何冷却       │
+    └────────┬────────┘
+             ↓
+    残余打包 (Residual Packing)
+             ↓
+         返回最优解
+```
 
 **核心优势：** 概率接受机制能有效跳出局部最优，自适应温度和再加热使算法在不同阶段保持合适的探索强度，GroupStats 增量评估使 swap 操作高效（O(d)），VND 采样模式在保持搜索精度的同时将计算量降低约 30 倍。
 

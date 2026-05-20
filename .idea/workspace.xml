@@ -5,14 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a3752f90-117a-4f11-92b2-7485862fe60d" name="更改" comment="开始使用claude之前第一版本代码">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/heuristics/algorithm.md" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/algorithm.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/heuristics/rrp_kmeans_vns.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/rrp_kmeans_vns.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/heuristics/rrp_sa.py" beforeDir="false" afterPath="$PROJECT_DIR$/heuristics/rrp_sa.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main_two_stage.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_two_stage.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/multi_inner_opt.py" beforeDir="false" afterPath="$PROJECT_DIR$/multi_inner_opt.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -119,7 +114,7 @@
       <recent name="D:\Program Files (x86)\Pycharm_project\two-stage\Old_code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.multi_inner_opt">
+  <component name="RunManager" selected="Python.main_two_stage">
     <configuration name="config" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="PythonProject" />
       <option name="ENV_FILES" value="" />
@@ -166,7 +161,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="main_two_stage" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="PythonProject" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -180,7 +175,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main_two_stage.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -237,11 +232,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.multi_inner_opt" />
         <item itemvalue="Python.experiment_two_stage" />
+        <item itemvalue="Python.main_two_stage" />
+        <item itemvalue="Python.multi_inner_opt" />
         <item itemvalue="Python.config" />
         <item itemvalue="Python.rrp_kmeans_vns" />
-        <item itemvalue="Python.main" />
       </list>
     </recent_temporary>
   </component>
@@ -298,7 +293,7 @@
       <workItem from="1779162127078" duration="14946000" />
       <workItem from="1779204474429" duration="1089000" />
       <workItem from="1779239643536" duration="8968000" />
-      <workItem from="1779254320717" duration="17953000" />
+      <workItem from="1779254320717" duration="21475000" />
     </task>
     <task id="LOCAL-00001" summary="测试">
       <option name="closed" value="true" />
@@ -356,7 +351,7 @@
     <option name="LAST_COMMIT_MESSAGE" value="开始使用claude之前第一版本代码" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/two_stage$main_two_stage.coverage" NAME="main_two_stage 覆盖结果" MODIFIED="1773641018196" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$main_two_stage.coverage" NAME="main_two_stage 覆盖结果" MODIFIED="1779292043392" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$main.coverage" NAME="main 覆盖结果" MODIFIED="1774159267021" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$neural_rl.coverage" NAME="neural_rl 覆盖结果" MODIFIED="1774147157546" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
     <SUITE FILE_PATH="coverage/two_stage$rrp_combine_repair.coverage" NAME="rrp_combine_repair 覆盖结果" MODIFIED="1773848348825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/heuristics" />
@@ -375,7 +370,7 @@
     <SUITE FILE_PATH="coverage/two_stage$main__1_.coverage" NAME="main (1) 覆盖结果" MODIFIED="1773498321063" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$.coverage" NAME="最新 覆盖结果" MODIFIED="1762095336866" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$upper_bound.coverage" NAME="upper_bound 覆盖结果" MODIFIED="1773546314997" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/two_stage$experiment_two_stage.coverage" NAME="experiment_two_stage 覆盖结果" MODIFIED="1779278472147" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/two_stage$experiment_two_stage.coverage" NAME="experiment_two_stage 覆盖结果" MODIFIED="1779292071868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/two_stage$fixed_quantity.coverage" NAME="fixed_quantity 覆盖结果" MODIFIED="1762095424472" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

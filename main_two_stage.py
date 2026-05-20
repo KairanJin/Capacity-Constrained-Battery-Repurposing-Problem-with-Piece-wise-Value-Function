@@ -232,11 +232,18 @@ def generate_arrival_sequence(cfg: Config, n_periods: int, seed: int) -> list[np
 # =========================================================
 
 def apply_threshold_scrap(I_t_plus: np.ndarray, eta: float, wq: np.ndarray):
+    """
+    根据质量阈值废弃电芯。
+    eta 现在解释为分位数比例（0~1），而非绝对分数。
+    例如 eta=0.25 表示废弃质量得分最低的 25% 电芯。
+    """
     if len(I_t_plus) == 0:
         return [], I_t_plus.copy()
 
     q_vals = default_quality_score(I_t_plus, wq=wq)
-    D_t = np.where(q_vals < eta)[0].tolist()
+    # eta 为分位数比例，计算对应的绝对分数阈值
+    abs_threshold = float(np.quantile(q_vals, eta))
+    D_t = np.where(q_vals < abs_threshold)[0].tolist()
 
     if len(D_t) == 0:
         return D_t, I_t_plus.copy()
@@ -797,7 +804,8 @@ def run_one_experiment_with_seed(
     methods 默认为顶部 METHODS 列表中启用的算法。
     """
     cfg = Config()
-    E_thresholds = [70, 80, 90, 100, 110, 115, 120, 125, 130, 135, 140]
+    # 废弃分位数比例：0 表示不弃置，0.25 表示废弃最差 25%，以此类推
+    E_thresholds = [0.0, 0.25, 0.5, 0.75, 1.0]
     m_list = [2, 4, 8]
     rho = 0.5
     gamma = 0.95
@@ -827,7 +835,8 @@ def main():
 
     n_periods = 20
     H_scrap = 5
-    E_thresholds = [70, 80, 90, 100, 110, 115, 120, 125, 130, 135, 140]
+    # 废弃分位数比例：0 表示不弃置，0.25 表示废弃最差 25%，以此类推
+    E_thresholds = [0.0, 0.25, 0.5, 0.75, 1.0]
     m_list = [2, 4, 8]
     rho = 0.5
     gamma = 0.95
