@@ -18,6 +18,14 @@ from outer.tsrah import tsrah_scrapping_decision, default_quality_score
 from outer.arrival import gaussian_arrival_generator
 
 
+def _standardize_cells(raw: np.ndarray, cfg: Config) -> np.ndarray:
+    """Convert raw (C, R) cells to z-scores using data config."""
+    return np.column_stack([
+        (raw[:, 0] - cfg.data.mu_C) / cfg.data.sigma_C,
+        (raw[:, 1] - cfg.data.mu_R) / cfg.data.sigma_R,
+    ])
+
+
 # =========================================================
 # 可在此处灵活控制参与实验的启发式算法种类
 # 注释/取消注释即可开关对应算法
@@ -290,7 +298,8 @@ def evaluate_eta_with_realized_horizon(
             U_tau = np.vstack([I_curr, A_tau])
 
         inner_seed = int(rng.integers(1, 10**9))
-        inner_res = solve_inner_rrp(U_tau, cfg, method=inner_method, seed=inner_seed)
+        X_tau = _standardize_cells(U_tau, cfg)
+        inner_res = solve_inner_rrp(X_tau, cfg, method=inner_method, seed=inner_seed)
 
         R_grp = float(inner_res.get("reward", 0.0))
         total_future_reward += (gamma ** tau) * R_grp
@@ -382,7 +391,8 @@ def simulate_stagewise_clairvoyant_upper_bound(
             U_t = np.vstack([I_t, A_t])
 
         inner_seed = int(rng.integers(1, 10**9))
-        inner_res = solve_inner_rrp(U_t, cfg, method=inner_method, seed=inner_seed)
+        X_t = _standardize_cells(U_t, cfg)
+        inner_res = solve_inner_rrp(X_t, cfg, method=inner_method, seed=inner_seed)
 
         groups_t = inner_res.get("groups", [])
         R_t_grp = float(inner_res.get("reward", 0.0))
@@ -493,7 +503,8 @@ def simulate_with_fixed_threshold_plan(
             U_t = np.vstack([I_t, A_t])
 
         inner_seed = int(rng.integers(1, 10**9))
-        inner_res = solve_inner_rrp(U_t, cfg, method=inner_method, seed=inner_seed)
+        X_t = _standardize_cells(U_t, cfg)
+        inner_res = solve_inner_rrp(X_t, cfg, method=inner_method, seed=inner_seed)
 
         groups_t = inner_res.get("groups", [])
         R_t_grp = float(inner_res.get("reward", 0.0))
@@ -586,7 +597,8 @@ def simulate_two_stage_system(
             U_t = np.vstack([I_t, A_t])
 
         inner_seed = int(rng.integers(1, 10**9))
-        inner_res = solve_inner_rrp(U_t, cfg, method=inner_method, seed=inner_seed)
+        X_t = _standardize_cells(U_t, cfg)
+        inner_res = solve_inner_rrp(X_t, cfg, method=inner_method, seed=inner_seed)
 
         groups_t = inner_res.get("groups", [])
         R_t_grp = float(inner_res.get("reward", 0.0))
@@ -601,7 +613,8 @@ def simulate_two_stage_system(
         if t % H_scrap == 0:
             def inner_solver_for_rollout(X, **kwargs):
                 rollout_seed = int(rng.integers(1, 10**9))
-                return solve_inner_rrp(X, cfg, method=inner_method, seed=rollout_seed)
+                X_std = _standardize_cells(X, cfg)
+                return solve_inner_rrp(X_std, cfg, method=inner_method, seed=rollout_seed)
 
             def arrival_fn_for_rollout(rng, **kwargs):
                 return gaussian_arrival_generator(

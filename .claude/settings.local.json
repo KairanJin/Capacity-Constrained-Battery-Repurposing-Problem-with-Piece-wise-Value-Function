@@ -42,7 +42,13 @@
       "Bash(.venv/Scripts/python.exe -c \"from scipy import stats; import numpy as np; help\\(stats.tukey_hsd\\)\")",
       "Bash(.venv/Scripts/python.exe experiment_two_stage.py --quick)",
       "Bash(.venv/Scripts/python.exe -c \"import main_two_stage; print\\('Import OK'\\); print\\('METHODS:', main_two_stage.METHODS\\)\")",
-      "Bash(.venv/Scripts/python.exe -c ' *)"
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python main_two_stage.py)",
+      "Bash(git rm *)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(taskkill /F /IM python3.13.exe)",
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(timeout 120 .venv/Scripts/python -c ' *)"
     ]
   }
 }
